@@ -1,0 +1,17 @@
+---
+title: "Conditional probability"
+subtitle: "Week1-ex3, problem statement"
+output: pdf_document 
+---
+
+Suppose that if $\theta = 1$, then $y$ has a Binomial distribution with success probability  $0.2$, and if $\theta = 2$, then $y$ has a Binomial distribution with success probability  $0.6$. Also, suppose that the sample size is $n=10$ and $Pr( \theta = 1) = 0.5$ and $Pr(\theta = 2) = 0.5$. 
+
+a) Write the formula for the marginal probability density for $y$ and sketch it. 
+b) What is $Pr( \theta = 1 | y = 3)$
+c) skecth the posterior predictive distribution for a new observation $\tilde{y}$ with sample size $\tilde{n}=10$. What is the posterior predictive probability that $\tilde{y}=3$?
+
+
+## Grading
+
+**Total 10 points:**  3 points for getting a) correct. 4 points for getting b) correct. 3 points for getting c) correct.
+

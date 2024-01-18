@@ -1,0 +1,194 @@
+---
+title: "Bayesian2"
+output: html_document
+date: "2022-11-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise 1
+
+### Task 1
+
+The formula for the posterior probability in this case is (NB, using $\propto$ here):
+\[
+p(\theta | y) \propto \Sigma_{i=1}^n Poisson(y_i | \theta*d)Gamma(\alpha,\beta)
+\]
+Where n are the relevant amounts of besettings between minimum and maximum, $Poisson(y_i | \theta*d)$ is the likelihood and $Gamma(\alpha,\beta)$ is the prior.
+
+### Task 2
+
+Creating bins and calculating and plotting the posterior:
+
+```{r task1}
+Nseq <- seq(0, 3, length=100)
+
+Nprior <- dgamma(Nseq, 1, 1)
+
+likelihood <- function(lamb){
+  dpois(3, lamb*6.56) + dpois(4, lamb*6.56) + dpois(5, lamb*6.56) + dpois(6, lamb*6.56)
+}
+
+Nposterior <- Nprior * likelihood(Nseq)
+
+Nposterior <- Nposterior/sum(Nposterior)
+
+#The posterior density at the 100 bins:
+plot(Nseq,Nposterior, main="Posterior", xlab="N", pch=16)
+```
+### Task 3
+
+Plotting the posterior cumulative and calculating probability for a value of over 1:
+
+```{r task 3}
+NposteriorCDF <- cumsum(Nposterior)
+
+#The posterior cumulative distribution
+plot(Nseq,NposteriorCDF, main="posterior CDF", xlab="N", pch=16)
+
+#probability for over 1
+1- NposteriorCDF[34]
+
+```
+### Task 4
+
+Plotting the posterior with exactly 6 besettings - as we can see, the posterior distribution is centered around a higher value of lambda.
+
+```{r 6besets}
+likelihood2 <- function(lamb){
+  dpois(6, lamb*6.56)
+}
+
+Nposterior2 <- Nprior * likelihood2(Nseq)
+Nposterior2 <- Nposterior2/sum(Nposterior2)
+
+plot(Nseq,Nposterior2, main="Posterior with 6 besettings", xlab="N", pch=16)
+#Answer: the probability is centered around a higher value of lambda
+
+```
+### Task 5
+
+Plotting a posterior prediction distribution (with densities [0.712891079, 0.231980557, 0.046592774, 0.007384883, 0.001010146]).
+:
+
+```{r prediction}
+y_tildes <- c(0,0,0,0,0)
+
+for (y in 0:4){
+  sum <- 0
+  for (i in 1:length(Nseq)){
+    sum <- sum + dpois(y, Nseq[i]*0.5)*Nposterior[i]
+
+  }
+  y_tildes[y+1] <- sum
+
+}
+
+#A plot of the density
+plot(c(0,1,2,3,4),y_tildes,type='b', main="Y_tildes in posterior prediction", xlab="N", pch=16)
+```
+## Exercise 2
+
+### Task a: vectorized form
+
+Median: 76, Variance: 637.6833, Standard deviation: 25.25239 and Confidence interval = [56, 113].
+
+Code for reaching these values:
+
+```{r vector}
+#Median
+media <- Nseq[which(NposteriorCDF>=0.5)[1]]
+
+#E(X^2) for the variance formula:
+EX2 <- sum(Nposterior*Nseq^2)
+variance <- EX2 - posteriorMean^2
+
+#standard deviation is the square root
+standd <- sqrt(variance)
+
+#80% confidence interval, start and end:
+begin <- Nseq[which(NposteriorCDF>=0.1)[1]]
+end <- Nseq[which(NposteriorCDF>=0.9)[1]]
+```
+
+### Task 2, same values by sampling
+
+Median: 77, Variance: 641.2322, Standard deviation: 25.32256, Confidence interval: [56, 113]
+
+Code for reaching those values:
+
+```{r sampling}
+#sampling:
+Nsamp = Nseq[sapply(runif(1000,min=0,max=1),function(temp){ which(NposteriorCDF>=temp)[1] })]
+#80% central posterior interval
+quantile(Nsamp,probs=c(0.1,0.9))
+#variance
+variance2 <- var(Nsamp)
+standd2 <- sd(Nsamp)
+median2 <- median(Nsamp)
+```
+
+## Exercise 3
+
+### Task 1
+
+The formula for the prior distribution is in the case of a binary likelihood and a beta prior as in this case:
+
+\[
+P(\theta | y) \propto Beta(\alpha + y, \beta + n - y) \propto Bin(y|n,\theta)Beta(\alpha, \beta)
+\]
+Where $Beta(\alpha, \beta)$ is the prior and $Bin(y|n,\theta)$ is the likelihood.
+
+### Task 2
+
+From the code below we get: $\theta_0$ posterior mean: 0.7637994, standard deviation: 0.02551218, $\theta_1$ posterior mean: 0.536846, standard deviation: 0.03305382.
+
+```{r calc}
+s_th0 <- rbeta(10000, succ0+1, n0-succ0+1)
+s_th1 <- rbeta(10000, succ1+1, n1-succ1+1)
+
+#posterior mean theta 0
+m_th0 <- mean(s_th0)
+
+#standard deviation theta 0
+sd_th0 <- sd(s_th0)
+
+#posterior mean theta 1
+m_th1 <- mean(s_th1)
+
+#standard deviation theta 1
+sd_th1 <- sd(s_th1)
+
+
+
+hist(s_th0, main="Samples for posterior theta=0")
+
+```
+
+```{r nextplot}
+
+hist(s_th1, main="Samples for posterior theta=1")
+```
+### Task 3
+
+Plotting the distribution for $\theta_0-\theta_1$.
+```{r minus}
+diff <- s_th0 - s_th1
+hist(diff, main="Distribution of difference between theta=0 and theta=1")
+```
+Using the code below to count instances of differences smaller than 0.
+```{r count}
+sum <- 0
+for (i in diff){
+  if (i <= 0){
+    sum <- sum +1
+  }
+}
+```
+The result was that all of the samples of $\theta_1$ was smaller than $\theta_0$, so with this data, we have to conclude that $p(\theta_1<\theta_0)\approx 1$.
+
+### Task 4
+
+In this case we used a perfectly flat prior, putting a bit of emphasis on the spread of the distribution in the posterior. If we would have made a prior assumption that we will have a narrow distribution, the difference between the two $\theta:s$ would have been even clearer. If we would have added weight on the outer boundaries of the distribution, with a prior with more density towards the marginals, we could have seen a bit less clear result, that $\theta_1$ and $\theta_0$ are significantly different.

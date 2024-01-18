@@ -1,0 +1,148 @@
+---
+title: "Bayesian 4"
+output:
+  word_document: default
+  pdf_document: default
+date: "2022-11-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise 1
+
+### Task a
+
+Formula:
+$p(\alpha, \theta_1 ... \theta_n | y_1 ... y_n) \propto p(\alpha) \prod_{i=1}^n p(\theta_i | \alpha) p(y_i | \theta_i) $
+
+Stan-model:
+```{r}
+model_a = "
+data {
+   int<lower=0> n;
+   real  y[n];
+}
+
+parameters {
+   real alpha;
+   real theta[n];
+}
+
+model {
+   alpha ~ p()
+   for i in 1:n {
+      theta[i] ~ p(alpha)
+      y[i] ~ p(theta[i])
+   }
+}
+"
+```
+
+### Task b
+
+Formula:
+$p(\alpha, \mu_1 ... \mu_n, \theta_{1,1} ... \theta_{m,n} | y_{1,1} ... y_{m,n}) \propto p(\alpha)\prod_{i=1}^m \left[p(\mu_i | \alpha) \prod_{j=1}^{n} p(\theta_{i,j} | \mu_i) p(y_{i,j} | \theta_{i,j})\right]$
+
+Stan-model:
+```{r}
+model_b = "
+data{
+   int<lower=0> n;
+   int<lower=0> m;
+   real  y[n*m];
+}
+
+parameters {
+   real alpha;
+   real mu[m];
+   real theta[m][n];
+}
+
+model {
+   alpha ~ p()
+   for i in 0:m-1 {
+      mu[i] ~ p(alpha)
+      for j in 0:n-1 {
+         theta[i][j] ~ p(mu[i])
+         y[m*i+j] ~ p(theta[m*i+j])
+      }
+   }
+}
+"
+```
+
+### Task c
+
+Formula:
+$p(\alpha, \gamma, \mu_1 ... \mu_n, \sigma_1 ... \sigma_n | y_1 ... y_n, x_i ... x_n) \propto p(\alpha)p(\gamma) \prod_{i=1}^n p(\mu_i | \alpha_i) p(\sigma_i | \gamma_i) p(y_i | x_i, \mu_i, \sigma_i)$
+
+Stan-model:
+```{r}
+model_c = "
+data {
+   int<lower=0> n;
+   real x[n];
+   real  y[n];
+}
+
+parameters {
+   real alpha;
+   real gamma;
+   real mu[n];
+   real sigma[n];
+}
+
+model {
+   alpha ~ p()
+   gamma ~ p()
+   for i in 1:n {
+      mu[i] ~ p(alpha)
+      sigma[i] ~ p(gamma)
+      y[i] ~ p(mu[i]*x[i], sigma[i]*x)
+   }
+}
+"
+```
+
+### Task d
+
+Stan-model:
+```{r}
+model_d = "
+data {
+   int<lower=0> n;
+   int<lower=0> J;
+   real y[J][n]
+}
+
+parameters {
+   real v1;
+   real v2;
+   real s1;
+   real s2;
+   real fi;
+   real mu0;
+   real mu[J];
+   real sigma[J];
+}
+
+model {
+   v1 ~ p()
+   v2 ~ p()
+   s1 ~ p()
+   s2 ~ p()
+   mu0 ~ norm(0, 10^6)
+   fi ~ inv_chi2(v1, s1)
+   for j in 1:J {
+      sigma[j] ~ inv_chi2(v2, s2)
+      mu[j] ~ norm(mu0, fi)
+      for i in 1:n {
+         y[j][i] ~ norm(mu[j], sigma[j])
+      }
+   }
+}"
+```
+
+

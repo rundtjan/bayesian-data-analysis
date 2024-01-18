@@ -1,0 +1,484 @@
+---
+title: "Week 5 BDA"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Monte Carlo error
+
+Let's construct a table of parameters leading to different Markov chains, each having the same marginal distribution $N(0,1)$ at the limit of large number of samples but each also having different amount of autocorrelation between the samples.
+
+```{r}
+varTheta = 1
+sigma2.1 = 1
+sigma2.3 = 0.2
+phi.2 = 0.5
+phi.4 = 0.1
+phi.1 = sqrt(1-sigma2.1/varTheta)
+phi.3 = sqrt(1-sigma2.3/varTheta)
+sigma2.2 = varTheta*(1-phi.2^2)
+sigma2.4 = varTheta*(1-phi.4^2)
+table.entries = matrix(nrow=4, ncol=4, data=c(
+  varTheta, phi.1, sigma2.1, phi.1,
+  varTheta, phi.2, sigma2.2, phi.2,
+  varTheta, phi.3, sigma2.3, phi.3,
+  varTheta, phi.4, sigma2.4, phi.4
+))
+table.entries <- t(table.entries)  # take transpose since matrix fills in the elements in columnwise
+colnames(table.entries) <- c("var(theta)", "phi", "sigma2","corr")
+print(table.entries)
+
+```
+
+Let's then construct a function to perform Markov chain sampling
+
+```{r}
+# let's first define a function to conduct the sampling
+MarkovChain <- function(phi,sigma2,initial,m){
+  theta = vector(length=m)
+  theta[1] = initial
+  for (i1 in seq(1,m-1,1)){
+    theta[i1+1] = phi*theta[i1] + rnorm(1,0,sqrt(sigma2))
+  }
+  return(theta)
+}
+```
+
+For this exercise it is handy to use multidimensional arrays to store the results (not necessary but saves some lines of code). Below an example:
+
+```{r}
+set.seed(123)
+arr = array(dim=c(2000,100,4))
+dim(arr)
+```
+
+Now we need to sample 100 independent realizations of length 2000 chains from the Markov chain defined in exercise 3.1 (that is; $\theta^{(1)},\dots, \theta^{(2000)}$) using each of the combinations of $\phi$ and $\sigma^2$ in the rows of the above table. 
+
+With each of the chains we approximate $E[\theta^{(i)}]$, $\text{Pr}(\theta^{(i)}>0.5)$ and $\text{Pr}(\theta^{(i)}>2)$ using Monte Carlo with the $n=10$, $n=100$ and $n=1000$ last samples. Hence, we will construct 100 independent Monte Carlo approximations for the mean and two probabilities of $\theta$ corresponding to Markov chain sample sizes 10, 100 and 1000.
+
+For example the below rows would construct two independent Markov chains of lenght 2000 and calculate the Monte Carlo approximation for the mean with the last 10 samples
+
+
+
+```{r, echo=FALSE}
+set.seed(123)
+
+i1=1
+m=2000
+initial = 0
+n=10
+theta1 = MarkovChain(table.entries[i1,"phi"],table.entries[i1,"sigma2"],initial,m)  # sample a Markov chain
+theta2 = theta = MarkovChain(table.entries[i1,"phi"],table.entries[i1,"sigma2"],initial,m)  # sample a Markov chain
+mean(theta1[(m-n+1):m])
+mean(theta2[(m-n+1):m])
+length(theta1)
+```
+```{r}
+#taking the samples
+for (i in 1:4){
+  for (j in 1:100){
+    arr[,j, i] = MarkovChain(table.entries[i,"phi"],table.entries[i,"sigma2"],initial,m)
+  }
+}
+```
+```{r}
+
+res = array(dim=c(3,100,3,4))
+ns = c(10, 100, 1000)
+for (i in 1:4){
+  for (j in 1:100){
+    for (n in 1:3){
+      temp = arr[,j,i][(m-ns[n]+1):m]
+      res[1,j,n,i] = mean(temp) 
+      res[2,j,n,i] = length(temp[temp > 0.5])/ns[n] #prob>.5
+      res[3,j,n,i] = length(temp[temp > 2])/ns[n] #prob>2
+    }
+  }
+}
+
+```
+Now, we need to repeat the above steps 100 times, calculate the mean and asked probabilities for each of the 100 chains and then examine how these Monte Carlo estimates behave and match with the exact results as we vary the row of the table and $n$. 
+
+
+**Task 1**
+
+The estimate of the expected value with respect to autocorrelation and amount of samples:
+
+```{r, echo=FALSE}
+set.seed(123)
+
+for (r in 1:4){
+  print(paste("Autocorrelation: ", table.entries[r,"corr"]))
+  print("==============================================")
+  means <- c(0,0,0)
+  for (j in 1:3){
+    print(paste("Sample-size: ", c(10,100,1000)[j]))
+    print("----------------------------------------------")  
+    print(paste("Mean: ", mean(res[1,,j,r])))
+    means[j] <- abs(mean(res[1,,j,r]))
+    print("----------------------------------------------")
+  }
+  print("Summary:")
+  print("-----------------------------------------------")
+  print("Development of difference between ~mean and true mean:")
+  print(means)
+  print("==============================================")
+  print("")
+}
+
+```
+From above we can see that a bigger sample size leads to an estimate which is closer to the true mean (which is 0), this is in line with the law of large numbers, as the variance of the sample will become smaller as the sample size grows. However, due to the nature of the Markov chain sampling, if the autocorrelation is bigger, it will take a longer time for the chain to converge to the real distribution, and this is visible in this material. In these particular samples, this effect tends to be most visible in the samples with n=100, at n=1000 all the chains seem to be quite usable.
+
+**Task 2**
+
+Now let's take a look at the estimates for Prob(>0.5):
+
+```{r, echo=FALSE}
+for (r in 1:4){
+  print(paste("Autocorrelation: ", table.entries[r,"corr"]))
+  print("==============================================")
+  probs1 <- c(0,0,0)
+  for (j in 1:3){
+    print(paste("Sample-size: ", c(10,100,1000)[j]))
+    print("----------------------------------------------")  
+    print(paste("Prob( > 0.5): ", mean(res[2,,j,r])))
+    probs1[j] <- abs((1-pnorm(.5)) - mean(res[2,,j,r]))
+    print("----------------------------------------------")
+  }
+  print("Summary:")
+  print("-----------------------------------------------")
+  print("Development of difference between ~prob(>.5) and true prob(>.5):")
+  print(probs1)
+  print("==============================================")
+  print("")
+}
+```
+
+Above we see the different results for Prob(>0.5) compared to the true value for a N(0,1) distribution (~0.31). Again, the estimates of the probability are closer to the true value as the sample size grows. The convergence is faster if autocorrelation is lower, but at n=1000 the chains are still quite usable regardless of autocorrelation.
+
+**Task 3**
+
+Now let's take a look at the estimates for Prob(>2):
+
+```{r, echo=FALSE}
+for (r in 1:4){
+  print(paste("Autocorrelation: ", table.entries[r,"corr"]))
+  print("==============================================")
+  probs2 <- c(0,0,0)
+  for (j in 1:3){
+    print(paste("Sample-size: ", c(10,100,1000)[j]))
+    print("----------------------------------------------")  
+    print(paste("Prob( > 2): ", mean(res[3,,j,r])))
+    probs2[j] <- abs((1-pnorm(2)) - mean(res[3,,j,r]))
+    print("----------------------------------------------")
+  }
+  print("Summary:")
+  print("-----------------------------------------------")
+  print("Development of difference between ~prob(>2) and true prob(>2):")
+  print(probs2)
+  print("==============================================")
+  print("")
+}
+```
+And no surprises here. Again we see convergence with bigger amounts of samples, and slower convergence at higher autocorrelation.
+
+**Task 4**
+
+The general conclusion is already mentioned as a part of the answers above, but in accordance to the law or large numbers, the estimates based on the samples converges towards the true distribution when the sample-size grows. Autocorrelation slows down the convergence, as the values tend to be more linked to each other, and therefore do not represent as random a sample as they would without autocorrelation, so you need bigger samples. At sample-size 1000, the values are quite reliable, so you would want to take a big enough amount of samples when using Markov chains.
+
+
+
+## Mauna Loa CO2 data 
+
+
+
+**1. variable transformations**
+
+Some formulas to find out how to transform the samples back to original scale: 
+
+$a(x - x_m) + b = y$
+
+$ax - ax_m + b = y$
+
+So reducing $x_m$ will change the intercept, and needs to be corrected:
+
+$b = \dot{b} - ax_m $
+
+What happens when reducing $y_m$ from $y$:
+
+$ax + b = y-y_m$
+
+$ax + b + y_m = y$
+
+So we get that:
+
+$b = \dot{b} + y_m $
+
+Let's look at the division with $x_{sd}$:
+
+$\dot{a}(x/x_{sd}) + b = c$
+
+$\dot{a}/x_{sd} * x + b = c$
+
+So we get that:
+
+$a = \dot{a}/x_{sd}$
+
+And division with $y_{sd}$:
+
+$\dot{a}x + \dot{b} = y/y_{sd}$
+
+$y_{sd}*ax + y_{sd}*\dot{b} = y$
+
+So we get that:
+
+$a = y_{sd}*a, b = y_{sd} * \dot{b}$.
+
+So combining the above:
+
+$a = y_{sd}*\dot{a} / x_{sd}$
+
+**2. Build and analyze Stan model**
+
+Load the needed libraries.
+```{r, results='hide'}
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+Load the data and explore its properties
+```{r}
+# Load the data and explore it visually
+maunaloa.dat = read.table("maunaloa_data.txt", header=FALSE, sep="\t")
+# The columns are 
+# Year January February ... December Annual average
+
+#  Notice! values -99.99 denote NA
+
+# Let's take the yearly averages and plot them
+x.year = as.vector(t(maunaloa.dat[,1]))
+y.year = as.vector(t(maunaloa.dat[,14]))
+# remove NA rows
+x.year = x.year[y.year>0]
+y.year = y.year[y.year>0]
+plot(x.year,y.year)
+
+# Let's take the monthy values and construct a "running month" vector
+y.month.orig = as.vector(t(maunaloa.dat[,2:13]))
+x.month.orig = as.vector(seq(1,length(y.month.orig),1))
+
+# remove NA rows
+x.month.orig = x.month.orig[y.month.orig>0]
+y.month.orig = y.month.orig[y.month.orig>0]
+plot(x.month.orig,y.month.orig)
+```
+
+
+```{r}
+
+# standardize y and x
+my =  mean(y.month.orig)       # mean of y values
+stdy = sd(y.month.orig)      # std of y values
+y.month = (y.month.orig - my)/stdy    # standardized y values
+
+mx = mean(x.month.orig)       # mean of y values
+stdx =  sd(x.month.orig)     # std of y values
+x.month = (x.month.orig- mx)/stdx    # standardized y values
+
+plot(x.month,y.month)
+
+```
+
+
+The model description and setting data into list
+```{r}
+mauna_loa_c02_model = "
+data{
+  int<lower=0> n;
+  real y[n];
+  real x[n];
+  real sdy;
+  real sdx;
+  real meany;
+  real meanx;
+}
+parameters{
+  real alpha;
+  real beta;
+  real<lower=0> sigma2;
+}
+transformed parameters{
+  real alpha_t;
+  real beta_t;
+  real sigma2_t;
+  alpha_t = sdy * (alpha - beta * meanx / sdx) + meany;
+  beta_t = beta * sdy / sdx;
+  sigma2_t = square(sdy * sqrt(sigma2));
+}
+
+model{
+  alpha ~ normal(0,sqrt(10));
+  beta ~ normal(1,sqrt(10));
+  sigma2 ~ inv_gamma(0.001, 0.001);
+  for (i in 1:n){
+    y[i] ~ normal(alpha + beta*x[i], sqrt(sigma2));
+  }
+}"
+
+data <- list (n=length(x.month), y=y.month, x=x.month,meany=mean(y.month.orig),sdy=sd(y.month.orig), meanx=mean(x.month.orig),sdx=sd(x.month.orig))
+```
+
+Now we will start the analysis. Define parameters and set initial values for them. We are going to sample four chains so we need four starting points. It is good practice to set them far apart from each others. We build linear regression model on data in order to get some reasonable initial values for our model parameters. Examine the convergence.
+
+```{r}
+# Initial values
+init1 <- list(alpha=0.7, beta=1.7, sigma2=0.2)
+init2 <- list(alpha=-0.5, beta=0.3, sigma2=0.01)
+init3 <- list(alpha=0, beta=1, sigma2=0.001)
+init4 <- list(alpha=0.5, beta=1.5, sigma2=0.02)
+#inits <- list(init1)
+inits <- list(init1, init2, init3, init4)
+
+post=stan(model_code=mauna_loa_c02_model,data=data,warmup=500,iter=2000,chains=4,thin=1,init=inits,control = list(adapt_delta = 0.8,max_treedepth = 10))
+```
+```{r}
+# Check for convergence, see PSRF (Rhat in Stan)
+print(post,pars=c("alpha","beta","sigma2"))
+print(post)
+plot(post, pars=c("alpha","beta","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+plot(post, pars=c("alpha","beta","sigma2"), plotfun= "trace", inc_warmup = FALSE)
+```
+
+
+As we can see from the plot and the summary, the chains have converged quite well and Rhat is 1 for all parameters.
+
+```{r}
+post_sample=as.matrix(post, pars =c("alpha","beta","sigma2"))
+```
+
+
+```{r}
+a_dot=post_sample[,1]
+b_dot=post_sample[,2]
+sigma2_dot=post_sample[,3]
+```
+
+
+```{r}
+a = stdy * (a_dot - b_dot * mx / stdx) + my;
+b = b_dot * stdy / stdx;
+sigma2 = (stdy*sqrt(sigma2_dot))^2
+```
+
+Now parameter a contains a sample from the posterior $p(a|y,x,n)$
+and parameter b contains sample from the posterior $p(b|y,x,n)$.
+We can now plot sample chains and histograms of them and do the required summaries.
+
+```{r}
+#Trace plot of MCMC output to see if the chains have converged for the original parameters
+plot(a, main="a", xlab="iter",type="l")
+plot(b, main="b", xlab="iter",type="l")
+plot(sigma2, main="sigma2", xlab="iter",type="l")
+
+
+hist(a, main="p(a|y,x,n)", xlab="a")
+hist(b, main="p(b|y,x,n)", xlab="b")
+hist(sigma2, main="p(tau|y,x,n)", xlab="sigma2")
+
+#calculate the required summaries
+#mean and 95% confidence interval of alpha
+mean(a)
+quantile(a,probs=c(0.025,0.975))
+#mean and 95% confidence interval of beta
+mean(b)
+quantile(b,probs=c(0.025,0.975))
+#mean and 95% confidence interval of sigma^2
+mean(sigma2)
+quantile(sigma2,probs=c(0.025,0.975))
+
+```
+The chains look well converged. 
+
+
+**3. Interpretation of $\mu(x)$ and $\epsilon_i$**
+
+Linear mean function $\mu(x)$ -- is the response from the covariate and some correlation plus the starting point from the beginning of measurements, e.g., the correlation between the covariate added to where the measurement and the target value y. This is the epistemic uncertainty that a sufficient amount of data and a correctly done modelling can alleviate, the "true" relationship between the measured x values (in this case, months that passes by) and the measured response y value (co2-amount that grows over time). 
+
+Epsilon is a combination of some epistemic uncertainty left in our model and the irreduceable error. The irreduceable error is the     error that can not be reduced, and is an aleatory uncertainty, a variation in the measurement or the system being measured which we can not alleviate by studying the data, we can only estimate its size. 
+
+
+**4. visualization of the regression curve**
+
+Data covers years from 1958 to 2008. Therefore, we need to construct prediction points 
+and predict the historical and future next 20 years of CO2 concentrations
+```{r, echo=FALSE}
+x.pred= seq(1,70*12,length=70*12)
+
+mu = matrix(NA,length(x.pred),length(b))      # matrix of posterior samples of mu
+y.tilde = matrix(NA,length(x.pred),length(b)) # matrix of posterior samples of y.tilde
+
+mean_mu=rep(NA, length(x.pred))              # posterior mean of mu
+int_mu = matrix(NA,length(x.pred),2)         # posterior 95% interval of mu
+
+mean_y=rep(NA, length(x.pred))              # posterior mean of y.tilde
+int_y = matrix(NA,length(x.pred),2)         # posterior 95% interval of y.tilde
+```
+
+```{r}
+for (i in 1:length(x.pred)) {
+  #remember mu_i = a + b*x_i
+  mu[i,] = a + b*(i)
+  mean_mu[i] = mean(mu[i,])
+  int_mu[i,] = quantile(mu[i,],probs=c(0.025,0.975))
+  #y_i = mu_i + e_i and e_i ~ N(0,sigma2)
+  y.tilde[i,] = rnorm(mu[i,],mu[i,], sqrt(sigma2))
+  mean_y[i] = mean(y.tilde[i,])
+  int_y[i,] = quantile(y.tilde[i,],probs=c(0.025,0.975))
+}
+```
+```{r}
+# plot the mean and quantiles for mean function and (replicate) observations and the real observations
+plot(x.pred,mean_mu, col="blue", main="CO2 at Mauna Loa, predictions and observations", type="l", xlab="Months since Jan 1958", ylab="CO2")
+lines(x.pred, int_mu[,1], col="blue", lty=2, type='l')
+lines(x.pred, int_mu[,2], col="blue", lty=2, type="l")
+lines(x.pred,mean_y, col="green",type="l")
+lines(x.pred, int_y[,1], col="green", lty=2, type='l')
+lines(x.pred, int_y[,2], col="green", lty=2, type="l")
+lines(x.month.orig,y.month.orig, col="black", type="l")
+legend(x="topleft", legend=c("Predicted mean", "Predicted Y", "Observations"),
+       col=c("blue", "green", "black"), lty=1:1:1, cex=0.8)
+```
+
+**5. CO2 concentration in January 2025 and 1958**
+
+ Posterior predictive distribution of the mean function in January 2025, January 1958 
+ and the difference between these. Notice! x=1 corresponds to January 1958
+
+```{r}
+jan2025 <- (2025-1958)*12
+jan2025_mu <- a + b*jan2025
+jan1958_mu <- a + b*1
+jan2025_tilde <- rnorm(b, jan2025_mu, sqrt(sigma2))
+jan1958_tilde <- rnorm(b, jan1958_mu, sqrt(sigma2))
+hist(jan2025_mu, main="Prediction of mu, january 2025", xlab = "CO2")
+hist(jan1958_mu, main="Prediction of mu, january 1958", xlab = "CO2")
+diff_mu <- jan2025_mu - jan1958_mu
+hist(diff_mu, main="Difference in predictions of mu", xlab = "Difference in CO2")
+hist(jan2025_tilde, main="Prediction of y, january 2025", xlab = "CO2")
+hist(jan1958_tilde, main="Prediction of y, january 1958", xlab = "CO2")
+diff <- jan2025_tilde - jan1958_tilde
+hist(diff, main="Difference in predictions of y", xlab = "Difference in CO2")
+```
+. 
+
+As we can see from above, the distribution of $y_i$ differs from $\mu(x_i)$ in that it is wider, i.e., that there is a bigger variation in the values. This comes from the fact that when we draw predictive samples, we add the $\epsilon$, which contains the irreducible error as well as the model bias, we do not, after all, know that the true response is strictly linear. So the later is a sample drawn out of a normal distribution on top of the distribution of $\mu(x_i)$ that we estimated from the model. We could say, that in the predictive y we double the uncertainty: there is the epistemic uncertainty inherent in our modeling of the linear response, and there is the aleatory uncertainty inherent as the irreducible error, modelled as a normal distribution with variation $\sigma^2$.

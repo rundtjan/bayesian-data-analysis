@@ -1,0 +1,61 @@
+---
+title: "Directed acyclic graphs"
+subtitle: "Week4-ex1, solution"
+output: pdf_document
+---
+
+\begin{minipage}{0.45\textwidth}
+\paragraph{a)-c)} 1) Write down the joint posterior probability distribution of all the parameters in the directed acyclic graphs (DAG) shown in Figure~\ref{fig:DAGs} and 2) Write down a Stan pseudo code that tells how a model corresponding to that DAG would be written. You can assume that all variables get values in real numbers. An example of a model answer is provided on the right
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+\hspace{1cm}
+\includegraphics[width=1.1\textwidth]{ex_DAG/ex_DAG_example.jpg}
+\end{minipage}
+
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=\textwidth]{ex_DAG/ex_DAG.jpg}
+\end{center}\caption{The DAGs for which the joint distribution and pseudo code have to be defined. Note variables denoted by $x$ should be treated as covariates.}\label{fig:DAGs}
+\end{figure}
+
+
+
+\paragraph{d)} Draw a Directed acyclic graph (DAG) and write a Stan pseudo code of the following model
+\begin{align*}
+y_{i,j} & \sim N(\mu_j,\sigma_j^2), i=1,\dots,n, j=1,\dots,J\\
+\mu_j & \sim N(\mu_0, \phi) \\
+\mu_0 &\sim N(0,10^6) \\
+\phi & \sim \text{Inv-}\chi^2(\nu_1,s_1^2)\\
+\sigma_j^2 & \sim \text{Inv-}\chi^2(\nu_2,s_2^2)
+\end{align*}
+See the previous problem for an example on the needed accuracy for the pseudo code.
+
+
+# Solution
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.70\textwidth]{ex_DAG/ex_DAG_result_a.jpg}
+\caption{Model answer a)}
+\end{figure}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.70\textwidth]{ex_DAG/ex_DAG_result_b.jpg}
+\caption{Model answer b)}
+\end{figure}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.75\textwidth]{ex_DAG/ex_DAG_result_c.jpg}
+\caption{Model answer c)}
+\end{figure}
+\begin{figure}[]
+\centering
+\includegraphics[width=0.75\textwidth]{ex_DAG/ex_draw_DAG_result.jpg}
+\caption{Model answer d)}
+\end{figure}
+
+\newpage
+# Grading
+
+**Total 20 points.** a)-c) Two points for correct joint density function and 3 points for correct pseudo-code. d) 3 points for correct DAG and 2 points for correct pseudo-code.

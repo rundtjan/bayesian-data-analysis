@@ -1,0 +1,97 @@
+{
+    "runStatus": "success",
+    "backtrace": [
+
+    ],
+    "testResults": [
+        {
+            "status": "fail",
+            "name": "exercise 1.1 is solved correctly",
+            "message": "c(a1_dot[3005], b1_dot[2341], sigma21_dot[5211]) not equal to c(0.01278223, 0.99470559, 0.02186823).\ntarget is NULL, current is numeric",
+            "backtrace": [
+
+            ],
+            "points": [
+
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "exercise 1.2 is solved correctly",
+            "message": "c(a_dot[3005], b_dot[2341], c_dot[321], sigma2_dot[5211]) not equal to c(-0.10966659, 0.98294125, 0.13198381, 0.01022179).\ntarget is NULL, current is numeric",
+            "backtrace": [
+
+            ],
+            "points": [
+
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "exercise 1.3 is solved correctly",
+            "message": "y.tilde[264, 3113] not equal to 8534.384.\ntarget is NULL, current is numeric",
+            "backtrace": [
+
+            ],
+            "points": [
+
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "exercise 1.4 is solved correctly",
+            "message": "c(lpd1, rmse1, lpd2, rmse2) not equal to c(144.2783, 0.1503274, 255.91146, 0.103879).\ntarget is NULL, current is numeric",
+            "backtrace": [
+
+            ],
+            "points": [
+
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "Hidden exercise 1.1 is solved correctly",
+            "message": "`a1_dot` not equal to `a1_correct`.\nLengths (0, 6000) differ (comparison on first 0 components)",
+            "backtrace": [
+
+            ],
+            "points": [
+                "W7.E1.1"
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "Hidden exercise 1.2 is solved correctly",
+            "message": "`a_dot` not equal to `a_correct`.\nLengths (0, 6000) differ (comparison on first 0 components)",
+            "backtrace": [
+
+            ],
+            "points": [
+                "W7.E1.2"
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "Hidden exercise 1.3 is solved correctly",
+            "message": "`y.tilde` not equal to `y_correct`.\ntarget is NULL, current is matrix",
+            "backtrace": [
+
+            ],
+            "points": [
+                "W7.E1.3"
+            ]
+        },
+        {
+            "status": "fail",
+            "name": "Hidden exercise 1.4 is solved correctly",
+            "message": "`lpd1` not equal to `lpd1_correct`.\nLengths (0, 1) differ (comparison on first 0 components)",
+            "backtrace": [
+
+            ],
+            "points": [
+                "W7.E1.4"
+            ]
+        }
+    ]
+}
+

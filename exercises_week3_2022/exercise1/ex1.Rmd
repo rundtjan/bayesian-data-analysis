@@ -1,0 +1,147 @@
+---
+title: "Experimenting with Markov chain"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Markov chain sampling
+
+The purpose of this exercise is to study the properties of Markov chains and how they can be used to produce samples for Monte Carlo estimation.
+
+
+Consider a Markov chain defined as follows:
+
+ * set $\theta^{(0)} = C$, where $C$ is some constant number.
+ * for $i=1,\dots$ sample $\theta^{(i)} \sim N(\phi \theta^{(i-1)},\sigma^2)$ where $\phi\in[0,1)$ is a parameter controlling the autocorrelation between samples.
+
+
+**Result for task 1: the limits**
+
+The variance of $\theta^{(i)}$ when $\phi \rightarrow 0$ is $\sigma^2$, because we get $\rightarrow \frac{\sigma^2}{1}$. When $\phi \rightarrow 1$ it is $\infty$ because we get formula $\rightarrow \frac{\sigma^2}{1-1}$,
+
+
+The correlation when $\phi \rightarrow 0$ is $0^t=0$, when $\phi \rightarrow 1$ it is $1^t=1$.
+
+
+**Result for task 2: the table**
+
+Given the marginal variance for $\theta^{(i)}$ we can solve for $\phi$ and $\sigma^2$ when the other is given:
+
+\begin{tabular}{c|c|c|c}
+$\text{Var}[\theta^{(i)}]$ & $\phi$ & $\sigma^2$ & $\text{Corr}[\theta^{(i)},\theta^{(i+1)}]$\\
+\hline
+1 &   0  &  1   &  \\ 
+1 & 0.5 &   \   &   \\
+1 &     &  0.2 & \\
+1 & 0.1 &   & \\
+\end{tabular}
+
+We can solve for $\phi$ with the formula: $Var[\theta^{(i)}]=\frac{\sigma^2}{1-\phi^2}$ and derive $1-\phi^2 = \frac{\sigma^2}{Var[\theta^{(i)}]} \rightarrow -\phi^2 = \frac{\sigma^2}{Var[\theta^{(i)}]} - 1 \rightarrow \phi = \sqrt{1- \frac{\sigma^2}{Var[\theta^{(i)}]}}$.
+
+We can solve for $\sigma^2$ with the same formula and derive: $\sigma^2 = Var[\theta^{(i)}](1-\phi^2)$.
+
+$Corr[\theta^{(i)}, \theta^{(i+1)}]$ we get from $\phi^t = \phi^1 = \phi$
+
+```{r}
+# Calculate the missing values
+phi_row_1 <- sqrt(1- 1/1)
+phi_row_1
+sigma_row_2 <- 1*(1-0.5^2)
+sigma_row_2
+phi_row_3 <- sqrt(1 - 0.2/1)
+phi_row_3
+sigma_row_4 <- 1*(1-0.1^2)
+sigma_row_4
+
+```
+So we get the complete table:
+
+\begin{tabular}{c|c|c|c}
+$\text{Var}[\theta^{(i)}]$ & $\phi$ & $\sigma^2$ & $\text{Corr}[\theta^{(i)},\theta^{(i+1)}]$\\
+\hline
+1 &   0  &  1   & 0 \\ 
+1 & 0.5 &   0.75   &  0.5 \\
+1 &   0.89  &  0.2 &  0.89\\
+1 & 0.1 & 0.99  & 0.1\\
+\end{tabular}
+
+**Result for task 3**
+
+Implementing the above Markov chain with R and using it to sample random realizations of $\theta^{(i)}$ where $i=1,\dots,100$ with the parameter values given in the above table. As an initial value using $C=10$. Plotting the sample chain and based on the visual inspection, what can we say about the convergence and mixing properties of the chain with the different choices of $\phi$?
+
+
+```{r}
+# let's first define a function to conduct the sampling
+
+markov <- function(first, phi, sigma, n){
+  vec <- c(first)
+  last <- first
+  for(x in 1:n){
+   last <- rnorm(1, mean=last*phi, sd=sigma)
+   vec <- append(vec, last)
+  }
+  vec
+}
+
+th1 <- markov(10, 0, 1, 100)
+th2 <- markov(10, 0.5, sqrt(3/4), 100)
+th3 <- markov(10, sqrt(4/5), sqrt(1/5), 100)
+th4 <- markov(10, 0.1, sqrt(0.99), 100)
+
+plot(th1, type='l')
+plot(th2, type='l')
+plot(th3, type='l')
+plot(th4, type='l')
+
+plot(th1, type="l", xlab="iteration", ylab=expression(theta), main="Checking mixing", ylim=c(-10,10))
+lines(th2, col="blue")
+lines(th3, col="red")
+lines(th4, col="orange")
+
+# Then we sample from the Markov chain with alternative phi and sigma values and draw them
+
+```
+The convergences clearly vary depending of the value of $\phi$, with a high $\phi$ causing slower convergence. All chains do eventually mix, but with higher $\sigma^2$ the noise from the variation is of course a bit higher.
+
+
+**Result for task 4**
+
+Choosing the parameter combination where $\sigma^2=0.2$ from the above table and running three Markov chains with initial values $C_1 = 10$, $C_2=-10$ and $C_3=5$. Finding a burn-in value at which the chains have converged according to the PSRF ($\hat{R}$) statistics. This is implemented in function \texttt{Rhat} in RStan. Note, $m=100$ samples might not be enough here.
+
+
+
+```{r}
+# Define the sample size
+m = 500
+
+# sample from three independent Markov chains as instructed in the exercise
+theta1 = markov(10, sqrt(4/5), sqrt(1/5), m)
+theta2 = markov(-10, sqrt(4/5), sqrt(1/5), m)
+theta3 = markov(5, sqrt(4/5), sqrt(1/5), m)
+
+# examine the chains visually
+plot(theta1, type="l", xlab="iteration", ylab=expression(theta), main=sprintf("sigma2=%.1f, phi=%.2f", 0.2,sqrt(4/5)), ylim=c(-10,10))
+lines(theta2, col="blue")
+lines(theta3, col="red")
+
+# Check visually where the sample chains seem to have converged to the same stationary
+# distribution 
+
+library(rstan)                       # First, load the necessary tool - that is Rhat function
+#?Rhat
+THETA = rbind(theta1,theta2,theta3)  # Put the chains into list where each row is one Markov chain 
+Rhat(THETA) 
+# if Rhat value is greater than 1.05 try to remove more samples from the beginning
+# However, note that you may need to increase the sample size in order to get reliable estimate for PSRF
+# Note also that the Rhat values change each time you rerun the Markov chains. Hence, even if with one 
+# realization the PSRF looked fine it might not be so in another even with same number of samples.
+
+```
+
+As we can see, the Rhat-value is good and the chains have converged as seen in the visualization. The chains converged quite fast, at around 20 iterations.
+

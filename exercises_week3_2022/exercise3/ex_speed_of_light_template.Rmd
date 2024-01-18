@@ -1,0 +1,173 @@
+---
+title: "Speed of light data analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Instructions
+
+Here we redo the analysis from page 66 in BDA3. The data are available from ex_speedOfLight.dat.
+
+Simon Newcomb conducted experiments on speed of light in 1882. He measured the time required for 
+light to travel a certain distance and here we will analyze a data recorded as deviations from $24,\!800$
+nanoseconds.  The model used in BDA3 is 
+%
+\begin{align*}
+y_i &\sim N(\mu, \sigma^2) \\
+p(\mu,\sigma^2) &\propto \sigma^{-2}.
+\end{align*}
+%
+where $y_i$ is the $i$'th measurement, $\mu$ is the mean of the measurement and $\sigma^{2}$ 
+the variance of the measurements. Notice that this prior is improper ("uninformative"). 
+This corresponds to widely used uniform prior for $\mu$ in the range $(-\infty,\infty)$, and uniform prior for $\log(\sigma)$ (BDA3 pp. 66, 52, and 21). Both priors are improper and 
+cannot be found from Stan. 
+You can use instead
+%
+\begin{align}
+p(\mu) &\sim N(0,(10^3)^2)\nonumber\\ 
+p(\sigma^2) &\sim \text{Inv-}\chi^2(\nu=4,s^2=1)  \label{eq:Inv-chi_prior}
+\end{align}
+
+In this exercise your tasks are the following:
+
+ 1. Write a Stan model for the above model and sample from the posterior of the parameters. Report the posterior mean, variance and 95\% central credible interval for $\mu$ and $\sigma^2$.
+ 2. Additionally draw samples from the posterior predictive distribution of hypothetical new measurement $p(\tilde{y}|y)$. Calculate the mean, variance and 95\% quantile of the posterior predictive distribution. 
+ 3. How does the posterior predictive distribution differ from the posterior 
+of $\mu$ and Why? 
+ 4. Which parts of the model could be interpreted to correspond to aleatory and epistemic uncertainty? Discuss whether this distinction is useful here. 
+ 5. Instead of Inverse-$\chi^2$ distribution the variance parameter prior has traditionally been defined using Gamma distribution for the precision parameter $\tau=1/\sigma^2$. By using the results in Appendix A of BDA3 derive the analytic form of a Gamma prior for the precision corresponding to the prior \eqref{eq:Inv-chi_prior}. This should be of the form $\text{Gamma}(\alpha,\beta)$, where $\alpha$ and $\beta$ are functions of $\nu$ and $s^2$.
+
+
+## Model answers
+
+
+Load the needed libraries into R and set options for multicore computer.
+```{r}
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+set.seed(123)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+**Part 1. **
+
+write the model description, set up initial values for 4 chains and sample from the posterior
+```{r}
+
+d <- read.table(file="ex_speedOfLight.dat", header=TRUE)
+d <- unlist(d)
+```
+
+```{r}
+lightspeed_model="
+data{
+int<lower = 0> length;
+vector[length] y;
+int<lower = 0> nu;
+int<lower = 0> chi_s;
+int<lower = 0> norm_s;
+int<lower = 0> mu_p;
+}
+parameters{
+real sigma;
+real mu;
+}
+model{
+sigma ~ scaled_inv_chi_square(nu, chi_s);//prior
+mu ~ normal(mu_p, norm_s);//prior
+y ~ normal(mu, sigma);//likelihood
+}
+"
+dataset <- list("nu"=4, "chi_s"=1, "mu_p"=0, "norm_s"=10^3, "length"=66, "y"=d)
+
+
+#give initial values for all chains for parameter theta
+init1 <- list(mu=1, sigma=1)
+init2 <- list(mu=15, sigma=2)
+init3 <- list(mu=30, sigma=3)
+inits <- list(init1, init2, init3)
+
+# stan function does all of the work of fitting a Stan model and 
+# returning the results as an instance of stanfit = post in our exercises.
+post=stan(model_code=lightspeed_model,data=dataset,init=inits,
+          warmup=500,iter=1000,chains=3,thin=1)
+```
+
+Let's then examine the convergence and autocorrelation of the chains.
+```{r}
+plot(post, plotfun = "trace", pars = c("mu", "sigma"), inc_warmup = TRUE)
+print(post,pars=c("mu", "sigma"))
+stan_ac(post,c("mu", "sigma"),inc_warmup = FALSE, lags = 25)
+```
+The convergence looks good, the autocorrelation is centered around zero at all higher values of lag and the rhat-value is clearly below 1.05.
+```{r}
+Nsamp=as.matrix(post, pars =c("mu", "sigma"))
+```
+Posterior mean and variance for $\mu$:
+```{r}
+#posterior mean for mu:
+mean(Nsamp[,1])
+#posterior variance for mu:
+var(Nsamp[,1])
+```
+Central credible interval for $\mu$:
+```{r}
+#central credible interval mu:
+quantile(Nsamp[,1],probs=c(0.05,0.95))
+```
+Mean and variance for $\sigma^2$:
+```{r}
+#posterior mean for sigma^2:
+mean(Nsamp[,2])
+#posterior variance for sigma^2:
+var(Nsamp[,2])
+```
+And central credible interval:
+```{r}
+#central credible interval for variance:
+quantile(Nsamp[,2],probs=c(0.05,0.95))
+```
+
+
+**Part 2.**
+Draving samples from posterior distribution:
+```{r}
+y_tilde = rnorm(length(Nsamp[,1]), Nsamp[,1], sqrt(Nsamp[,2]))
+```
+Mean, variance and central credible interval for $\tilde{y}$:
+```{r}
+mean(y_tilde)
+var(y_tilde)
+quantile(y_tilde,probs=c(0.05,0.95))
+```
+
+**Part 3**
+
+Let's plot the observations from part 1:
+
+```{r}
+hist(d, breaks=10)
+```
+As we can see, there are some quite distant outliers, below -40. In the posterior, these outliers produces a very high variance, at (mean) ~10. When we draw a new sample, using this posterior, the sample will look more like a regular Gaussian bell curve:
+```{r}
+hist(y_tilde, breaks=10)
+```
+This will place more weight on a broader area around the mean, which also makes the central credible interval broader. 
+
+Besides that, the $\tilde{y}$ vector is a new sample, from a distribution with a somewhat high variation, so there is a big probability to see some difference in the means from different samples.
+
+**Part 4**
+
+One epistemic uncertainty here lies in what the actual mean of the speed of light is. If we want to have a prior that is not entirely flat, we need some kind of estimate for where to put the mean on that prior, and this is an epistemic challenge. The aleatory uncertainty in this case is associated with the noise from the conditions of the measurement. We can not know to which degree particular circumstances that might affect the results will be realized during the moment we do the measurements. To name some examples: if temperature, seismic activity or humidity potentially affect the instruments, we do not know which exact conditions we will have at the time we use them for measurements. However, knowing which conditions affect our measurement is more of an epistemic uncertainty. We can reduce that uncertainty by examining our instruments and gathering information on the relevant conditions during the experiment. Information that we then can take into account to calibrate the results we get.
+
+**Part 5**
+The relationship according to BDA3 between inverse scaled chi square distribution and inverse gamma is that $\alpha =\frac{v}{2}$ and $\beta = \frac{v}{2}s^2$. In this case we get an inverse gamma with $\alpha=4/2 = 2$ and $\beta=4/2*1^2=2$.
+

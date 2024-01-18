@@ -1,0 +1,256 @@
+---
+title: "Effect of bottom coverage to larval presence"
+subtitle: "Week6-ex1, problem statement"
+output:
+  word_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+In this exercise, we continue the analysis of the white fish larval areas (week 2, exercise 3 and week4, exercise 2). This time we extend the model to include regression along two continues covariates in addition to the vegetation cover status. The additional covariates that we are interested in are the distance to sandy shore and the length of ice cover during winter. Many fishermen have observed that white fish are caught more easily from sandy shores than elsewhere during their spawning season. Moreover, white fish spawn their eggs during fall but the larvae hatch only in the spring. Hence, it has been suggested that longer ice cover period works as a shelter for the eggs. Hence, let's take a look whether there is statistical signal to these covariates. 
+
+Let's load the data and construct covariate matrix $X$ (a matrix where the $i$'th row contains the covariates for the $i$'th sampling site), vector of area indexes $a$ (areas in the code) and vector of white fish presence-absence observations $y$.
+```{r}
+# Read the data
+data = read.csv("white_fishes_data.csv")
+
+# Let's then take the covariates to matrix X and standardize them
+X = data[,c("DIS_SAND","ICELAST09","BOTTOMCOV")]
+
+# And for last let's take the presence-absence observations of white fish larvae into Y
+y = data$WHIBIN
+```
+Unlike in our previous analyses of this data we treat each sampling site as one observation and consider the triplets $\{y_i,a_i,X_i\}$ ($X_i$ is the $i$'th row of $X$) exchangeable.
+
+
+We will first build the following model to analyze the data. 
+\begin{align*}
+y_{i} & \sim \text{Bernoulli}(\theta_{i})\\
+\text{logit}(\theta_{i}) & = \alpha + X\beta \\
+\alpha,\beta_1,\beta_2,\beta_3 &\sim N(0,10) \\
+\end{align*}
+Hence, we assume that the prior expectation of the probability to observe white fish larvae ($E[y_i]=\theta_i$) follows logit linear model where $\alpha$ is the intercept and $\beta$ is a $3\times 1$ vector of (fixed) effects of covariates. Note that the matrix notation $X\beta$ is the same as writing 
+$$X\beta = \beta_1\times\text{DISSAND}+\beta_2\times\text{ICELAST09}+\beta_3\times \text{BOTTOMCOV}$$
+
+Note also that the DIS_SAND and ICELAST09 are continuous covariates whereas BOTTOMCOV is a categorical covariate getting value 1 if the bottom is covered by vegetation and 0 if the bottom is not covered by vegetation. 
+```{r}
+par(mfrow=c(1,3))
+hist(X$DIS_SAND)
+hist(X$ICELAST09)
+hist(X$BOTTOMCOV)
+```
+Hence, the parameter $\beta_3$ corresponds to the effect of vegetation to the observation probability of white fish larvae.
+<!-- and, thus, $-\beta_3$ measures the same as quantity as $\Delta \mu$ in exercise 2 of week 4 and $\phi=\Delta \theta=\theta_0-\theta_1$ in exercise 3 of week 4. Now we have just accounted for other covariates in our analysis. -->
+
+Before starting the analysis we standardize the continues covariates but not the categorical BOTTOMCOV covariate. If we standardized the categorical variable the interpretation of $\beta_3$ parameter would change.
+```{r}
+mx = colMeans(X[,1:2])
+stdx = apply(X[,1:2],2,sd)
+X[,1:2] = (X[,1:2]-t(replicate(dim(X)[1],mx)))/t(replicate(dim(X)[1],stdx))
+```
+
+**Task 1:**
+
+Implement the model in Stan and sample from the posterior for the parameters $\alpha$ and $\beta$. Check for convergence of the MCMC chain and examine the autocorrelation of the samples. Visualize the posterior for $\alpha$ and $\beta$ and discuss the results.
+ 
+First we define the model:
+ 
+```{r}
+logit_fish_model = "
+data{
+   int<lower = 0> n;
+   real DIS_SAND[n];
+   real ICELAST09[n];
+   int BOTTOMCOV[n];
+   int<lower=0,upper=1> y[n];
+}
+
+parameters{
+   real alpha;
+   real beta_1;
+   real beta_2;
+   real beta_3;
+}
+
+model{
+   //priors:
+   alpha ~ normal(0, sqrt(10));
+   beta_1 ~ normal(0, sqrt(10));
+   beta_2 ~ normal(0, sqrt(10));
+   beta_3 ~ normal(0, sqrt(10));
+   for (i in 1:n){
+      y[i] ~ bernoulli_logit(alpha + beta_1*DIS_SAND[i] + beta_2*ICELAST09[i] + beta_3*BOTTOMCOV[i]);
+   }
+}
+
+"
+```
+
+Then prepare the data:
+
+```{r}
+
+data <- list (n=length(y), DIS_SAND=X$DIS_SAND, ICELAST09=X$ICELAST09, BOTTOMCOV=X$BOTTOMCOV, y=y)
+
+```
+
+Then running the model:
+
+```{r, echo=FALSE}
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+library(coda)
+
+```
+```{r}
+
+post=stan(model_code=logit_fish_model,data=data,warmup=500,iter=2000,chains=4,thin=1)
+
+```
+ 
+Convergence etc.:
+
+```{r}
+print(post)
+
+```
+```{r}
+plot(post,plotfun= "trace", inc_warmup = TRUE)
+ 
+```
+```{r}
+stan_ac(post,inc_warmup = FALSE, lags = 25)
+```
+As we can conclude from above, the convergence and autocorrelation of the chains were in order. Rhats at 1, visually we can see that the chains have converged, and the autocorrelation is around zero at all higher lags.
+
+```{r}
+Nsamp=as.matrix(post)
+plot(post, plotfun = "hist", pars = list('alpha', 'beta_1', 'beta_2', 'beta_3') ,bins=50)
+
+```
+As we can see from the histograms above, alpha, i.e., the intercept is around 1.2, while distance to sandy shores have a negative impact on the prevalence of white fish larvae, a longer icecover has a positive effect on white fish larvae, and (as we have seen in earler exercises) bottom cover vegetation has a negative effect of white fish larvae. The distribution of the parameters has retained a gaussian spread.
+
+**Task 2.**
+
+Calculate the posterior correlation between $\alpha$ and $\beta_3$. How does this differ from the prior correlation and why?
+
+```{r}
+corr <- cor(Nsamp[,'alpha'], Nsamp[,'beta_3'])
+corr
+
+```
+The prior did not still include any information on the target values y, and that is why the only thing that affected the values were the prior, uninformed and identical distribution. After training the model on the target data, the distribution of $\alpha$ and $\beta_3$ have changed to adapt to their role in the linearly logistic model. The prior correlation, as both $\alpha$ and $\beta_3$ was drawn from a N(0,10) distribution, should have been close to 0. In the posterior, the correlation is -0.716, which shows, that with a higher intercept or $\alpha$, $\beta_3$ needs to be lower, in order to reach the same result for $\alpha + \beta X$. 
+
+**Task 3.*
+Visualize the posterior of $\theta$ as a function of ICELAST09 when DISSAND is set to its mean value and in both cases when BOTTOMCOV=0 and BOTTOMCOV=1. That is, draw the median and 95% credible interval of the prediction function within the range from minimum to maximum value of ICELAST09 in the data.
+ 
+```{r}
+mean_sand = mean(X$DIS_SAND)
+sigmoid = function(x) {
+   1 / (1 + exp(-x))
+}
+```
+
+```{r}
+#beta_2s = Nsamp[, 'beta_2']*X$ICELAST09#calculate this individually for all values of icelast and plot median and confidence interval of result.
+thetas_cov0 = array(dim=c(length(X$ICELAST09),3))
+icelast <- X$ICELAST09
+icelast <- sort(icelast)
+```
+```{r}
+
+for (i in 1:502){
+  bx <- Nsamp[, 'alpha'] + Nsamp[,'beta_1']*mean_sand +Nsamp[,'beta_2']*icelast[i] + Nsamp[,'beta_3'] * 0;
+  theta <- sigmoid(bx)
+  thetas_cov0[i,1] <- median(theta)
+  thetas_cov0[i,2] <- quantile(theta,probs=c(0.025))
+  thetas_cov0[i,3] <- quantile(theta,probs=c(0.975))
+}
+```
+```{r}
+plot(icelast,thetas_cov0[,1], col="blue", main="Theta without vegetation", type="l", xlab="Values of ICELAST09, normalized", ylab="Theta")
+lines(icelast,thetas_cov0[,2], col="blue", lty=2, type='l')
+lines(icelast,thetas_cov0[,3], col="blue", lty=2, type="l")
+legend(x="topleft", legend=c("Median", "Confidence interval"),
+       col=c("blue", "blue"), lty=1:2, cex=0.8)
+```
+```{r}
+thetas_cov1 = array(dim=c(length(X$ICELAST09),3))
+for (i in 1:502){
+  bx2 <- Nsamp[, 'alpha'] + Nsamp[,'beta_1']*mean_sand +Nsamp[,'beta_2']*icelast[i] + Nsamp[,'beta_3'] * 1;
+  #theta2 <- sigmoid(bx2)
+  thetas_cov1[i,1] <- sigmoid(median(bx2))
+  thetas_cov1[i,2] <- sigmoid(quantile(bx2,probs=c(0.025)))
+  thetas_cov1[i,3] <- sigmoid(quantile(bx2,probs=c(0.975)))
+}
+```
+
+
+```{r}
+plot(icelast,thetas_cov1[,1], col="blue", main="Theta with vegetation", type="l", xlab="Values of ICELAST09, normalized", ylab="Theta")
+lines(icelast,thetas_cov1[,2], col="blue", lty=2, type='l')
+lines(icelast,thetas_cov1[,3], col="blue", lty=2, type="l")
+legend(x="topleft", legend=c("Median", "Confidence interval"),
+       col=c("blue", "blue"), lty=1:2, cex=0.8)
+```
+**Task 4.**
+
+Visualize the posterior distribution of $\theta$ at location where DIS_SAND is 60 and ICELAST is 18 for both vegetated and non-vegetated bottom types as well as their difference.
+
+First normalizing the values given:
+```{r}
+sand <- (60-mx['DIS_SAND'])/stdx['DIS_SAND']
+ice <- (18-mx['ICELAST09'])/stdx['ICELAST09']
+print(sand)
+print(ice)
+```
+Then calculate thetas:
+
+```{r}
+bx0 <- Nsamp[, 'alpha'] + Nsamp[,'beta_1']*sand +Nsamp[,'beta_2']*ice + Nsamp[,'beta_3'] * 0;
+theta0 <- sigmoid(bx0)
+
+bx1 <- Nsamp[, 'alpha'] + Nsamp[,'beta_1']*sand +Nsamp[,'beta_2']*ice + Nsamp[,'beta_3'] * 1;
+theta1 <- sigmoid(bx1)
+
+hist(theta0, main="Theta without vegetation, DIS_SAND=60, ICELAST=18")
+hist(theta1, main="Theta with vegetation, DIS_SAND=60, ICELAST=18")
+hist(theta0-theta1, main="Difference between these thetas")
+
+```
+
+**Task 5.** 
+
+How does the difference in $\theta$ for vegetated and non-vegetated bottom differ from $\phi=\Delta \theta=\theta_0-\theta_1$ in exercise 3 of week 2 and $\delta \mu$ in exercise 2 of week 4? Would you say that the result concerning the effect of vegetation is consistent in all these different analyses? Which analysis would you prefer?
+
+Compared to the difference of $\theta$ in week 2, the difference found here is somewhat smaller. The calculation in week 2 was a somewhat more naive approach, that did not take into considerations the difference between different areas. The difference found in week 4, again, is closer to this difference. As the calculation in week 4 took into consideration the possible differences in the sites, the logic of that $\theta$ is somewhat closer to this one, albeit the difference calculated above is for one specific site only.
+
+The result is still somewhat consistent, a site without vegetation tends to have more white fish larvae than sites with vegetation.
+
+In my own opinion, this last one seems the most compelling model, as here we are also trying to understand the factors that affect the occurence of white fish larvae in different sites, and therefore it is also more informative. By building this model, we can actually make some kind of inference for a new site without calculation, just by looking at those parameters that we have found to be important.
+
+**Task 6.** 
+
+Visualize the posterior distribution of $\tilde{y}$ corresponding to the number sampling occasions where white fish is present out of a total 10 repeated sampling occasions at location where DIS_SAND is 60 and ICELAST is 18 for both vegetated and non-vegetated bottom types.
+
+Drawing random samples:
+```{r}
+sample_0 <- rbinom(theta0, 10, theta0)
+sample_1 <- rbinom(theta1, 10, theta1)
+hist(sample_0, main="Sample without vegetation, DIS_SAND=60, ICELAST=18", xlab="White fish present")
+hist(sample_1, main="Sample with vegetation, DIS_SAND=60, ICELAST=18", xlab="White fish present")
+
+```
+ 
+# Grading
+
+**Total 20 points** Steps 1, 3 and 4 give 4 points each, steps 5 and 6 give 2 points each and step 2 gives 1 point if correctly solved. In other steps except 2 you may give half of the points if the step is solved half correctly. This could mean that some of the tasks have not been done (e.g. discussion is missing), there is only small typo that makes the final answer wrong or discussion is clearly not relevant or appropriate.
+
+
+# References
+
+Lari Veneranta, Richard Hudd and Jarno Vanhatalo (2013). Reproduction areas of sea-spawning Coregonids reflect the environment in shallow coastal waters. Marine Ecology Progress Series, 477:231-250. <http://www.int-res.com/abstracts/meps/v477/p231-250/>

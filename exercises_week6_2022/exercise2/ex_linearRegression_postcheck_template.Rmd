@@ -1,0 +1,461 @@
+---
+title: "ex_lineaRegression_postcheck"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+In the original Mauna Loa CO$_2$ data analysis we visualized the posterior predictive distribution of the expected CO$_2$ with respect to the month and compared it to the observed data points. This can be seen as one method for visual posterior predictive check. However, let's continue model checking a bit more and then improve the model based on our findings.
+
+Conduct posterior predictive check for the Mauna Loa CO$_2$ data in similar manner as in the Speed of Light example in BDA3. Sample 20 replicates of the \emph{data set} and do the following:
+\begin{itemize}
+\item[1.] Plot histograms of the replicate data sets. Compare the histograms of replicate data sets to the histogram of the real data. Discuss whether the replicate histograms look similar to the real data histogram -- remember to justify your discussion.
+\end{itemize}
+
+To sample a replicate data set you must sample $\tilde{y} = [\tilde{y}_1,\dots,\tilde{y}_n]$ values from $\tilde{y}_i \sim N(\mu_i,\sigma^2)$, 
+where $\mu_i = a + bx_i$ and $a, b, \sigma^2$ are drawn from the posterior. For example, pick 20 random triplets of $a, b, \sigma^2$ from the Markov chain and for each of them sample $\tilde{y}$. Then plot histogram of each $\tilde{y}$.\\
+
+Next, revise the model so that $\mu_i = a + bx_i + cx_i^2$. Find the posterior of the parameters of the new model and do the following:
+\begin{itemize}
+\item[2.] Plot the posterior mean and central 95\% credible interval of $\mu$ and $\tilde{y}$ as a function of $x$ with the new model. Overlay this plot with the data. Is there visual improvement in the fit between the 95\% credible intervals and observations? If yes, how?
+\item[3.] Do the same full data posterior predictive check as with the original model by visualizing the histograms of the full true data and 20 full replicate data sets. Discuss whether the replicate histograms look similar to the real data histogram -- remember to justify your discussion. Did the model refinement improve models behaviour in this respect?
+%\item Plot the histograms of all February CO$^2$ concentrations from the replicate data and the real data. Compare the replicate data set histograms to the histogram of the real data. Discuss whether the replicate histograms look similar to the real data histogram -- remember to justify your discussion.
+%\item Based on the above comparisons where does the model work well and where not? 
+\end{itemize}
+
+Note! Since you are not asked about the parameter inference, you don't need to worry about how to scale $\dot{c}$ back to $c$ even if you standardize your $y$ and $x$.
+
+The danger with sequantial model refinements is that we conduct it so long that our model overfits the data. Hence, 
+\begin{itemize}
+\item[4.]compare these two alternative models (M1: $\mu_i = a + bx_i$, M2: $\mu_i = a + bx_i + cx_i^2$) with posterior predictive comparison by dividing the data into two parts and taking every other observation into training data and every other observation into test data. 
+\end{itemize}
+Conduct the posterior predictive comparison using the point-wise log predictive density 
+$$ \text{lpd} = \sum_{i=1}^{n_{\text{test}}} \log p(\tilde{y}_i|\tilde{x}_i,y_{\text{training}},x_{\text{training}}) $$
+and the root mean squared error
+$$ \text{RMSE} = \sqrt{\frac{1}{n_{\text{test}}} \sum_{i=1}^{n_{\text{test}}}(E[\tilde{y}_i|\tilde{x}_i,y_{\text{training}},x_{\text{training}}]-\tilde{y}_i)^2}$$
+where $y_{\text{training}},x_{\text{training}}$ are the training and test data and $\tilde{y}_i,\tilde{x}_i$ are the test data points.
+Which of the models has better posterior predictive performance. Based on this results, does it seem that model M2 has overfitted the data?
+
+Note, 
+\begin{align*}
+p(\tilde{y}_i|\tilde{x}_i,y_{\text{training}},x_{\text{training}})&=\int p(\tilde{y}_i|\tilde{x}_i,\theta)p(\theta|y_{\text{training}},x_{\text{training}})d\theta\\
+& \approx \sum_{s=1}^Sp(\tilde{y}_i|\tilde{x}_i,\theta^{(s)})
+\end{align*}
+where $\theta^{(s)}$ is a sample from the posterior distribution of the parameters ($\theta=\{a,b,\sigma^2\}$ in the original model), that is $\theta^{(s)}\sim p(\theta|y_{\text{training}},x_{\text{training}})$.
+
+
+\paragraph{GRADING:} Each of the above four tasks provides 5 points from correct implementation and answer. Each task gives 2 points if it is done towards right direction and partially correct.
+
+
+\paragraph{Solution:}
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Load the needed libraries.
+```{r}
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+set.seed(123)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+Load the data and explore its properties
+```{r}
+# Load the data and explore it visually
+maunaloa.dat = read.table("maunaloa_data.txt", header=FALSE, sep="\t")
+# The columns are 
+# Year January February ... December Annual average
+
+#  Notice! values -99.99 denote NA
+
+# Let's take the yearly averages and plot them
+x.year = as.vector(t(maunaloa.dat[,1]))
+y.year = as.vector(t(maunaloa.dat[,14]))
+# remove NA rows
+x.year = x.year[y.year>0]
+y.year = y.year[y.year>0]
+plot(x.year,y.year)
+
+# Let's take the monthy values and construct a "running month" vector
+y.month.orig = as.vector(t(maunaloa.dat[,2:13]))
+x.month.orig = as.vector(seq(1,length(y.month.orig),1))
+
+# remove NA rows
+x.month.orig = x.month.orig[y.month.orig>0]
+y.month.orig = y.month.orig[y.month.orig>0]
+plot(x.month.orig,y.month.orig)
+
+# standardize y and x
+my = mean(y.month.orig)
+stdy = sd(y.month.orig)
+y.month = (y.month.orig-my)/stdy
+
+mx = mean(x.month.orig)
+stdx = sd(x.month.orig)
+x.month = (x.month.orig-mx)/stdx
+
+plot(x.month,y.month)
+
+
+# data list
+data <- list (N=length(x.month), y=y.month, x=x.month)
+```
+
+## Posterior predictive check
+
+
+Analysis with the original model 
+
+$y_i = a + bx_i + \epsilon_i$
+
+
+```{r}
+mauna_loa_c02_model = "
+data{
+  int<lower=0> N; // number of observations 
+  real y[N];     // observed CO2 values 
+  real x[N];    // observed times 
+}
+parameters{
+  real a;
+  real b;
+  real<lower=0> sigma2;   
+}
+transformed parameters{
+  real<lower=0> sigma;
+  real mu[N];
+  
+  sigma=sqrt(sigma2);
+  
+  for( i in 1 : N ) {
+    mu[i] = a + b * x[i];
+  }
+}
+model{
+  a ~ normal( 0, sqrt(1e6));
+  b ~ normal( 0, sqrt(1e6));
+  sigma2 ~ inv_gamma(0.001,0.001);
+  
+  for( i in 1 : N ) {
+    y[i] ~ normal(mu[i],sigma);
+  }
+}"
+```
+```{r}
+set.seed(123)
+post=stan(model_code=mauna_loa_c02_model,data=data,warmup=500,iter=2000,chains=4,thin=1,control = list(adapt_delta = 0.8,max_treedepth = 10))
+
+# Check for convergence, see PSRF (Rhat in Stan)
+print(post,pars=c("a","b","sigma2"))
+#print(post)
+plot(post, pars=c("a","b","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+plot(post, pars=c("a","b","sigma2"), plotfun= "trace", inc_warmup = FALSE)
+```
+The Rhat-values of 1 and the convergence seem good.
+
+
+```{r}
+set.seed(123)
+# extract the samples into matrix
+post_sample <- as.matrix(post, pars =c("a","b","sigma2"))    # combine all chains into one matrix in R workspace
+a_dot=post_sample[,1]
+b_dot=post_sample[,2]
+sigma2_dot=post_sample[,3]
+
+
+# This means that the prediction inputs have to be standardized as well
+
+x.pred= (seq(1,70*12,length=70*12)-mx)/stdx
+mu = matrix(NA,length(x.pred),length(b_dot))
+y.tilde = matrix(NA,length(x.pred),length(b_dot))
+
+mean_mu=rep(NA, length(x.pred))
+int_mu = matrix(NA,length(x.pred),2)
+
+mean_y=rep(NA, length(x.pred))
+int_y = matrix(NA,length(x.pred),2)
+
+for (i in 1:length(x.pred)) {
+  #mu[i,] = (a + b*x.pred[i])*stdy + my
+  mu[i,] = a_dot + b_dot*x.pred[i]
+  mean_mu[i]=mean(mu[i,])
+  int_mu[i,] = quantile(mu[i,],probs=c(0.025,0.975))
+  #y_i = mu_i + e_i and e_i ~ N(0,sigma2)
+  y.tilde[i,] =  mu[i,] + rnorm(length(mu[i,]), 0, sqrt(sigma2_dot))
+  mean_y[i]=mean(y.tilde[i,])
+  int_y[i,] = quantile(y.tilde[i,],probs=c(0.025,0.975))
+  
+}
+
+plot(x.pred,mean_mu, type="l",col="blue") #posterior mean for mu(x)
+lines(x.pred,int_mu[,1],col="green")
+lines(x.pred,int_mu[,2],col="green") # 95% interval of mu(x)
+lines(x.pred,mean_y, type="l",col="magenta") #posterior mean for y.tilde
+lines(x.pred,int_y[,1],col="red")
+lines(x.pred,int_y[,2],col="red") # 95% interval of y.tilde
+lines(x.month,y.month)
+points(x.month,y.month, cex=0.2)
+
+```
+
+
+Now we are ready to conduct the posterior predictive check
+
+First, sample 20 random draws from the Markov chain
+```{r}
+set.seed(123)
+
+pred_sample <- post_sample[sample(nrow(post_sample),size=20,replace=TRUE),]
+
+```
+```{r}
+
+post_pred <- array(dim=c(20, length(x.month)))
+for (i in 1:20){
+  for (j in 1:length(x.month)){
+    post_pred[i,j] <- rnorm(1, (pred_sample[i, 'a'] + pred_sample[i, 'b'] * x.month[j]), pred_sample[i, 'sigma2'])
+  }
+}
+#for (i in 1:20){plot(x.month, post_pred[i,])}
+
+```
+```{r}
+hist(y.month, main = "Histogram of original data")
+for (i in 1:20){hist(post_pred[i,], main="Histogram of sample from posterior")}
+
+```
+**Analysis:**
+
+From the histograms we see that the posterior predictive samples are not very convincing. They are very evenly distributed over the range of x, while the original data was more heavy on the lower values. It seems like this model can not replicate this feature in the real data, and we probably ought to look for another, more correct model.
+
+
+Let's refine the model so that 
+
+$mu = a+b*x+c*x^2$
+
+and rerun the analysis
+
+```{r}
+mauna_loa_c02_model2 = "
+data{
+  int<lower=0> N; // number of observations 
+  real y[N];     // observed CO2 values 
+  real x[N];    // observed times 
+}
+parameters{
+  real a;
+  real b;
+  real c;
+  real<lower=0> sigma2;   
+}
+transformed parameters{
+  real<lower=0> sigma;
+  real mu[N];
+  
+  sigma=sqrt(sigma2);
+  
+  for( i in 1 : N ) {
+    mu[i] = a + b * x[i] + c * square(x[i]);
+  }
+}
+model{
+  a ~ normal( 0, sqrt(1e6));
+  b ~ normal( 0, sqrt(1e6));
+  c ~ normal( 0, sqrt(1e6));
+  sigma2 ~ inv_gamma(0.001,0.001);
+  
+  for( i in 1 : N ) {
+    y[i] ~ normal(mu[i],sigma);
+  }
+}
+"
+```
+```{r}
+post2=stan(model_code=mauna_loa_c02_model2,data=data,warmup=500,iter=2000,chains=4,thin=1,control = list(adapt_delta = 0.8,max_treedepth = 10))
+
+# Check for convergence, see PSRF (Rhat in Stan)
+print(post2,pars=c("a","b","c", "sigma2"))
+#print(post)
+plot(post2, pars=c("a","b", "c","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+plot(post2, pars=c("a","b", "c","sigma2"), plotfun= "trace", inc_warmup = FALSE)
+```
+The Rhat-values of 1 and the convergence and autocorrelation seem good.
+
+Let's then examine the prediction along months
+
+```{r}
+set.seed(123)
+# extract the samples into matrix
+post_sample2 <- as.matrix(post2, pars =c("a","b", "c","sigma2"))    # combine all chains into one matrix in R workspace
+a_dot2=post_sample2[,1]
+b_dot2=post_sample2[,2]
+c_dot2=post_sample2[,3]
+sigma2_dot2=post_sample2[,4]
+  
+```
+```{r}
+mu2 = matrix(NA,length(x.pred),length(b_dot))
+y.tilde2 = matrix(NA,length(x.pred),length(b_dot))
+
+mean_mu2=rep(NA, length(x.pred))
+int_mu2 = matrix(NA,length(x.pred),2)
+
+mean_y2=rep(NA, length(x.pred))
+int_y2 = matrix(NA,length(x.pred),2)
+
+for (i in 1:length(x.pred)) {
+  #mu[i,] = (a + b*x.pred[i])*stdy + my
+  mu2[i,] = a_dot2 + b_dot2*x.pred[i] + c_dot2*(x.pred[i]^2)
+  mean_mu2[i]=mean(mu2[i,])
+  int_mu2[i,] = quantile(mu2[i,],probs=c(0.025,0.975))
+  #y_i = mu_i + e_i and e_i ~ N(0,sigma2)
+  y.tilde2[i,] =  mu2[i,] + rnorm(length(mu2[i,]), 0, sqrt(sigma2_dot2))
+  mean_y2[i]=mean(y.tilde2[i,])
+  int_y2[i,] = quantile(y.tilde2[i,],probs=c(0.025,0.975))
+  
+}
+
+plot(x.pred,mean_mu2, type="l",col="blue") #posterior mean for mu(x)
+lines(x.pred,int_mu2[,1],col="green")
+lines(x.pred,int_mu2[,2],col="green") # 95% interval of mu(x)
+lines(x.pred,mean_y2, type="l",col="magenta") #posterior mean for y.tilde
+lines(x.pred,int_y2[,1],col="red")
+lines(x.pred,int_y2[,2],col="red") # 95% interval of y.tilde
+lines(x.month,y.month)
+points(x.month,y.month, cex=0.2)
+```
+**Analysis of linear graph**
+
+From the graph we can see that the prediction by the model is closer to the curved shape that we can observe in the original data. A curve like this in a linear regression task usually is a sign that it would be good to check a model using the squares or higher powers of the features in the data.
+
+
+And then we can do the asked posterior predictive check
+
+```{r}
+pred_sample2 <- post_sample2[sample(nrow(post_sample2),size=20,replace=TRUE),]
+post_pred2 <- array(dim=c(20, length(x.month)))
+for (i in 1:20){
+  for (j in 1:length(x.month)){
+    post_pred2[i,j] <- rnorm(1, (pred_sample2[i, 'a'] + pred_sample2[i, 'b'] * x.month[j] + pred_sample2[i, 'c'] * (x.month[j]^2)), pred_sample[i, 'sigma2'])
+  }
+}
+#for (i in 1:20){plot(x.month, post_pred2[i,])}
+```
+```{r}
+hist(y.month, main="Histogram of original data")
+for (i in 1:20){hist(post_pred2[i,], main="Histogram of posterior data with x^2")}
+
+```
+**Analysis**
+
+We see that with this model, the posterior predictive samples are much more similar to the original data. The samples are more concentrated at lower values, exactly like in the original data, and as can be expected with a linear model of with the square of a feature.
+
+## Posterior predictive comparison
+
+Let's next compare the models' cababilities to predict unseen data. 
+For this we divide the data into training and test sets, infer the model 
+parameters with the former and evaluate models performance in predicting 
+the latter
+
+Split the data into training and test sets so that you put every other data point into training and every other into test (we could do random split as well).
+```{r}
+x.month.train <- x.month[seq(1, length(x.month), 2)]
+x.month.test <- x.month[seq(2, length(x.month), 2)]
+y.month.train <- y.month[seq(1, length(y.month), 2)]
+y.month.test <- y.month[seq(2, length(y.month), 2)]
+```
+
+Sample from the posterior distribution of the first model ($\mu=a+bx$) conditional on the training data and check for convergence
+```{r}
+set.seed(123)
+data <- list (N=length(x.month.train), y=y.month.train, x=x.month.train)
+post3=stan(model_code=mauna_loa_c02_model,data=data,warmup=500,iter=2000,chains=4,thin=1,control = list(adapt_delta = 0.8,max_treedepth = 10))
+
+# Check for convergence, see PSRF (Rhat in Stan)
+print(post3,pars=c("a","b","sigma2"))
+#print(post)
+plot(post3, pars=c("a","b","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+plot(post3, pars=c("a","b","sigma2"), plotfun= "trace", inc_warmup = FALSE)
+```
+
+The Rhats are good at 1 and visually one can see that the chains have converged.
+
+Sample from the posterior distribution of the second model ($\mu=a+bx+cx^2$) conditional on the training data and check for convergence
+```{r}
+set.seed(123)
+post4=stan(model_code=mauna_loa_c02_model2,data=data,warmup=500,iter=2000,chains=4,thin=1,control = list(adapt_delta = 0.8,max_treedepth = 10))
+
+# Check for convergence, see PSRF (Rhat in Stan)
+print(post4,pars=c("a","b","c", "sigma2"))
+#print(post)
+plot(post4, pars=c("a","b","c", "sigma2"),plotfun= "trace", inc_warmup = TRUE)
+plot(post4, pars=c("a","b","c", "sigma2"), plotfun= "trace", inc_warmup = FALSE)
+```
+
+Again, Rhats and convergence looks fine.
+
+Now we can calculate point-wise posterior predictive log density and RMSE at test locations
+
+Starting with RMSE:
+```{r}
+post_sample3 <- as.matrix(post3, pars =c("a","b","sigma2"))
+a3 <- post_sample3[, 'a']
+b3 <- post_sample3[, 'b']
+sigma23 <- post_sample3[, 'sigma2']
+```
+```{r}
+mu3 <- array(dim = c(length(x.month.test)))
+for (i in 1:length(x.month.test)){
+  mu3[i] <- mean(a3 + b3*x.month.test[i])
+}
+```
+```{r}
+RMSE <- sqrt(sum((y.month.test - mu3 )^2))
+RMSE
+```
+```{r}
+post_sample4 <- as.matrix(post4, pars =c("a","b","c", "sigma2"))
+a4 <- post_sample4[, 'a']
+b4 <- post_sample4[, 'b']
+c4 <- post_sample4[, 'c']
+sigma24 <- post_sample4[, 'sigma2']
+
+mu4 <- array(dim = c(length(x.month.test)))
+for (i in 1:length(x.month.test)){
+  mu4[i] <- mean(a4 + b4*x.month.test[i] + c4*(x.month.test[i]^2))
+}
+
+RMSE2 <- sqrt(sum((y.month.test - mu4 )^2))
+RMSE2
+
+``` 
+**Analysis of RMSE**
+The RMSE of the squared, second model is at $\approx1.81$ lower than the RMSE for the first linear model at $\approx2.62$, which indicates that the second model ($mu = a+b*x+c*x^2$) produces predictions that were closer to the measured values. The sum of the squares of differences between the predictions and the actual values is smaller.
+
+
+Then let's have a look at the log predictive density:
+```{r}
+loglik1 <- array(dim = c(length(x.month.test)))
+for (i in 1:length(x.month.test)){
+  loglik1[i] <- log(mean(dnorm(y.month.test[i], a3 + b3*x.month.test[i], sigma23)))
+}
+sum(loglik1)
+```
+```{r}
+loglik2 <- array(dim = c(length(x.month.test)))
+for (i in 1:length(x.month.test)){
+  loglik2[i] <- log(mean(dnorm(y.month.test[i], a4 + b4*x.month.test[i] + c4*(x.month.test[i]^2), sigma24)))
+}
+sum(loglik2)
+#y.month.test
+```
+**Analysis of predictive log likelihood**
+
+The result of these calculations are a bit unclear to me. As I understand it, a lower log likelihood would imply a worse model, so in that case, this test would show that the model with a squared feature would not be the better model. I therefore draw the conclusion that either there is something wrong with the calculation (which would be strange, as I attended the exercise session specifically to ask for help for this, so it would be confusing if I wouldn't have received correct guidance), or then I am incorrect in interpreting the predictive log likelihood.

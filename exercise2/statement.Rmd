@@ -1,0 +1,42 @@
+---
+title: "Censored observations"
+subtitle: "Week3-ex2, problem statement"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercise instructions
+
+This is the same exercise as 2.1 except that now the posterior inference is performed with MCMC using Stan. Hence, instead of the grid based approximation we use Monte Carlo approximation to do the same analyses as in exercise 2.1.
+
+Suppose you have a $\text{Gamma}(\alpha=1,\beta=1)$ prior distribution on the parameter $\lambda$ which corresponds to the expected number of ship ice besetting events (=events where a ship gets stuck in ice) during 1000 nautical miles in ice infested waters. The number of besetting events, $y$ per distance $d$ (nm) is modeled with a Poisson distribution $\text{Poisson}(\lambda \times d)$.
+The hyper-parameter $\alpha$ is the shape and $\beta$ is the inverse scale parameter. You are told that during winters 2013-2017 category A ice breakers traveled in total 6560 nautical miles in the Kara Sea (a sea area in the Arctic Sea). Within this distance they experienced in total more than 2 but less than 7 ice besetting events. 
+
+
+\begin{itemize}
+\item[1)] Implement the model with Stan and sample from the posterior of $\lambda$.
+\begin{itemize}
+\item[a)] Check for convergence visually and by calculating the PSRF statistics.
+\item[b)] Calculate the autocorrelation of the samples.
+\end{itemize}
+\item[2)] Using the samples of $\lambda$ 
+\begin{itemize}
+\item[a)] draw the posterior density function of $\lambda$ and 
+\item[b)] calculate the posterior probability that $\lambda<1$ and the 5\% and the 95\% quantiles.
+\item[c)] calculate the posterior mean and variance of $\lambda$.
+\end{itemize}
+\item[3)] Draw samples from the posterior predictive distribution for new $\tilde{y}$ for a ship traveling 1500 nm distance and 
+\begin{itemize}
+\item[a)] draw histogram of samples from the posterior predictive distribution for $\tilde{y}$
+\item[b)] Calculate the posterior predictive mean and variance of $\tilde{y}$
+\end{itemize}
+\end{itemize}
+
+
+# Grading
+
+**Total 10 points:** 4 points for correclty doing step 1. 3 points for correctly doing step 2. 3 points for correctly doing step 3. 
+

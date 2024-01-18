@@ -1,0 +1,88 @@
+---
+title: "Experimenting with Markov chain"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Markov chain sampling
+
+The purpose of this exercise is to study the properties of Markov chains and how they can be used to produce samples for Monte Carlo estimation.
+
+
+Consider a Markov chain defined as follows:
+
+ * set $\theta^{(0)} = C$, where $C$ is some constant number.
+ * for $i=1,\dots$ sample $\theta^{(i)} \sim N(\phi \theta^{(i-1)},\sigma^2)$ where $\phi\in[0,1)$ is a parameter controlling the autocorrelation between samples.
+
+Note! This is a Markov chain that is constructed very differently from how Stan constructs the Markov chains to sample from the posterior distributions. However, the properties related to autocorrelation and initial value are analogous.
+
+**Result for task 1: the limits**
+
+[FILL in here or on paper]
+
+
+**Result for task 2: the table**
+
+Given the marginal variance for $\theta^{(i)}$ we can solve for $\phi$ and $\sigma^2$ when the other is given
+
+[FILL in here or on paper]
+
+```{r}
+# Calculate the missing values
+
+
+```
+
+
+**Result for task 3**
+
+Implement the above Markov chain with R and use it to sample random realizations of $\theta^{(i)}$ where $i=1,\dots,100$ with the parameter values given in the above table. As an initial value use $C=10$. Plot the sample chain and based on the visual inspection, what can you say about the convergence and mixing properties of the chain with the different choices of $\phi$?
+
+
+```{r}
+# let's first define a function to conduct the sampling
+# Write a for loop to conduct the sampling (Note. This can be written as a function 
+# so that you don't need to repeat the loop many times)
+
+# Then we sample from the Markov chain with alternative phi and sigma values and draw them
+
+```
+
+
+**Result for task 4**
+
+Choose the parameter combination where $\sigma^2=0.2$ from the above table. Run three Markov chains with initial values $C_1 = 10$, $C_2=-10$ and $C_3=5$. Find a burn-in value at which the chains have converged according to the PSRF ($\hat{R}$) statistics. This is implemented in function \texttt{Rhat} in RStan. Note, $m=100$ samples might not be enough here.
+
+
+
+```{r}
+# Define the sample size
+m = 
+
+# sample from three independent Markov chains as instructed in the exercise
+theta1 = 
+theta2 = 
+theta3 = 
+
+# examine the chains visually
+plot(theta1, type="l", xlab="iteration", ylab=expression(theta), main=sprintf("sigma2=%.1f, phi=%.2f", table.entries[3,"sigma2"],table.entries[3,"phi"]), ylim=c(-10,10))
+lines(theta2, col="blue")
+lines(theta3, col="red")
+
+# Check visually where the sample chains seem to have converged to the same stationary
+# distribution 
+
+library(rstan)                       # First, load the necessary tool - that is Rhat function
+# ?Rhat
+THETA = rbind(theta1,theta2,theta3)  # Put the chains into list where each row is one Markov chain 
+Rhat(... 
+# if Rhat value is greater than 1.05 try to remove more samples from the beginning
+# However, note that you may need to increase the sample size in order to get reliable estimate for PSRF
+# Note also that the Rhat values change each time you rerun the Markov chains. Hence, even if with one 
+# realization the PSRF looked fine it might not be so in another even with same number of samples.
+
+```
+

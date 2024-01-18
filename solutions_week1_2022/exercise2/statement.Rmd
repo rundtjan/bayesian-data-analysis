@@ -1,0 +1,20 @@
+---
+title: "About uncertainty and subjective probability"
+subtitle: "Week1-ex2, problem statement"
+output: pdf_document 
+---
+
+\begin{itemize}
+\item[a)] Read the first Chapter of BD3 and Anthony O'Hagan (2004). \emph{Dicing with the uncertainty}. Significance. (can be found from the course home page).  Reflect your thoughts about the above texts. For example, does the aleatory and epistemic uncertainties make sense? Describe how you understand the term uncertainty. Where does uncertainty arise from, how does it relate to data analysis?
+
+\item[b)] Discuss the following statement. "The probability of event $E$ is considered \emph{subjective} if two rational persons A and B can assign unequal probabilities to $E$, $P_A(E)$ and $P_B(E)$. These probabilities can also be interpreted as \emph{conditional}: $P_A(E) = P(E|I_A)$ and $P_B(E) = P(E|I_B)$, where $I_A$ and $I_B$ represent the knowledge available to persons A and B, respectively." Apply this idea to the following examples. 
+  \begin{itemize}
+  \item[1]  The probability that a 6 appeared when a fair die was rolled, and A observed the outcome of the die roll whereas B did not. 
+\item[2] The probability that Brazil wins the next World Cup, where A is ignorant of soccer and B is a knowledgeable sports fan.
+\end{itemize}
+\end{itemize}
+Write shortly! Use one page at maximum!
+
+## Grading
+
+**Total 10 points:** 4 points from a) and  3 points from c1) and from c2).

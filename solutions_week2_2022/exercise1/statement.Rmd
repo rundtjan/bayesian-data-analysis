@@ -1,0 +1,30 @@
+---
+title: "Censored observations"
+subtitle: "Week2-ex1, problem statement"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercise instructions
+
+Suppose you have a $\text{Gamma}(\alpha=1,\beta=1)$ prior distribution on the parameter $\lambda$ which corresponds to the expected number of ship ice besetting events (=events where a ship gets stuck in ice) during 1000 nautical miles in ice infested waters. The number of besetting events, $y$ per distance $d$ (nm) is modeled with a Poisson distribution $\text{Poisson}(\lambda \times d)$.
+The hyper-parameter $\alpha$ is the shape and $\beta$ is the inverse scale parameter. You are told that during winters 2013-2017 category A ice breakers traveled in total 6560 nautical miles in the Kara Sea (a sea area in the Arctic Sea). Within this distance they experienced in total more than 2 but less than 7 ice besetting events. 
+
+\begin{itemize}
+\item[1)] Write down the equation for the posterior probability density for $\lambda$. 
+\item[2)] Discretize interval $[0,3]$ into 100 equally spaced intervals, calculate the unnormalized posterior probability density at each of the discrete bins, normalize the densities to sum up to one and draw the posterior density at the discrete cells.
+\item[3)] Using the discretized values of $\lambda$ and their corresponding posterior density values \begin{itemize}
+\item[a)] draw the posterior cumulative distribution function of $\lambda$ and
+\item[b)] calculate the posterior probability that $\lambda>1$.
+\end{itemize}
+\item[4)] Draw the posterior probability density for $\lambda$ in case where you are told that the exact number of besetting events is 6. What are the differences between the posterior densities from 2) and 4)?
+\item[5)] Calculate the posterior predictive probability mass function for number of besetting events, $\tilde{y}$, within a 500 nm distance by using the posterior predictive density from step 2) and draw it.  Note, you can restrict $\tilde{y}\in [0,4]$
+\end{itemize}
+
+
+## Grading
+
+**Total 10 points:** Two points from correct answer in each step. One point per step if the main idea is correct but the result is erroneous because of a minor bug or misthought.

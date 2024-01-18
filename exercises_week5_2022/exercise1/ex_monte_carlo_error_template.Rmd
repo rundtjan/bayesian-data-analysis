@@ -1,0 +1,186 @@
+---
+title: "Monte Carlo error"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Let's construct a table of parameters leading to different Markov chains, each having the same marginal distribution $N(0,1)$ at the limit of large number of samples but each also having different amount of autocorrelation between the samples.
+
+```{r}
+varTheta = 1
+sigma2.1 = 1
+sigma2.3 = 0.2
+phi.2 = 0.5
+phi.4 = 0.1
+phi.1 = sqrt(1-sigma2.1/varTheta)
+phi.3 = sqrt(1-sigma2.3/varTheta)
+sigma2.2 = varTheta*(1-phi.2^2)
+sigma2.4 = varTheta*(1-phi.4^2)
+table.entries = matrix(nrow=4, ncol=4, data=c(
+  varTheta, phi.1, sigma2.1, phi.1,
+  varTheta, phi.2, sigma2.2, phi.2,
+  varTheta, phi.3, sigma2.3, phi.3,
+  varTheta, phi.4, sigma2.4, phi.4
+))
+table.entries <- t(table.entries)  # take transpose since matrix fills in the elements in columnwise
+colnames(table.entries) <- c("var(theta)", "phi", "sigma2","corr")
+print(table.entries)
+
+```
+
+Let's then construct a function to perform Markov chain sampling
+
+```{r}
+# let's first define a function to conduct the sampling
+MarkovChain <- function(phi,sigma2,initial,m){
+  theta = vector(length=m)
+  theta[1] = initial
+  for (i1 in seq(1,m-1,1)){
+    theta[i1+1] = phi*theta[i1] + rnorm(1,0,sqrt(sigma2))
+  }
+  return(theta)
+}
+```
+
+For this exercise it is handy to use multidimensional arrays to store the results (not necessary but saves some lines of code). Below an example:
+
+```{r}
+set.seed(123)
+arr = array(dim=c(2000,100,4))
+dim(arr)
+```
+
+Now we need to sample 100 independent realizations of length 2000 chains from the Markov chain defined in exercise 3.1 (that is; $\theta^{(1)},\dots, \theta^{(2000)}$) using each of the combinations of $\phi$ and $\sigma^2$ in the rows of the above table. 
+
+With each of the chains we approximate $E[\theta^{(i)}]$, $\text{Pr}(\theta^{(i)}>0.5)$ and $\text{Pr}(\theta^{(i)}>2)$ using Monte Carlo with the $n=10$, $n=100$ and $n=1000$ last samples. Hence, we will construct 100 independent Monte Carlo approximations for the mean and two probabilities of $\theta$ corresponding to Markov chain sample sizes 10, 100 and 1000.
+
+For example the below rows would construct two independent Markov chains of lenght 2000 and calculate the Monte Carlo approximation for the mean with the last 10 samples
+
+
+
+```{r}
+set.seed(123)
+
+i1=1
+m=2000
+initial = 0
+n=10
+theta1 = MarkovChain(table.entries[i1,"phi"],table.entries[i1,"sigma2"],initial,m)  # sample a Markov chain
+theta2 = theta = MarkovChain(table.entries[i1,"phi"],table.entries[i1,"sigma2"],initial,m)  # sample a Markov chain
+mean(theta1[(m-n+1):m])
+mean(theta2[(m-n+1):m])
+length(theta1)
+```
+```{r}
+#taking the samples
+for (i in 1:4){
+  for (j in 1:100){
+    arr[,j, i] = MarkovChain(table.entries[i,"phi"],table.entries[i,"sigma2"],initial,m)
+  }
+}
+```
+```{r}
+
+res = array(dim=c(3,100,3,4))
+ns = c(10, 100, 1000)
+for (i in 1:4){
+  for (j in 1:100){
+    for (n in 1:3){
+      temp = arr[,j,i][(m-ns[n]+1):m]
+      res[1,j,n,i] = mean(temp) 
+      res[2,j,n,i] = length(temp[temp > 0.5])/ns[n] #prob>.5
+      res[3,j,n,i] = length(temp[temp > 2])/ns[n] #prob>2
+    }
+  }
+}
+
+```
+Now, we need to repeat the above steps 100 times, calculate the mean and asked probabilities for each of the 100 chains and then examine how these Monte Carlo estimates behave and match with the exact results as we vary the row of the table and $n$. 
+
+
+## Task 1
+
+The estimate of the expected value with respect to autocorrelation and amount of samples:
+
+```{r}
+set.seed(123)
+
+for (r in 1:4){
+  print(paste("Autocorrelation: ", table.entries[r,"corr"]))
+  print("==============================================")
+  means <- c(0,0,0)
+  for (j in 1:3){
+    print(paste("Sample-size: ", c(10,100,1000)[j]))
+    print("----------------------------------------------")  
+    print(paste("Mean: ", mean(res[1,,j,r])))
+    means[j] <- abs(mean(res[1,,j,r]))
+    print("----------------------------------------------")
+  }
+  print("Summary:")
+  print("-----------------------------------------------")
+  print("Development of difference between ~mean and true mean:")
+  print(means)
+  print("==============================================")
+  print("")
+}
+
+```
+From above we can see that a bigger sample size leads to an estimate which is closer to the true mean (which is 0), this is in line with the law of large numbers, as the variance of the sample will become smaller as the sample size grows. However, due to the nature of the Markov chain sampling, if the autocorrelation is bigger, it will take a longer time for the chain to converge to the real distribution, and this is visible in this material. In these particular samples, this effect tends to be most visible in the samples with n=100, at n=1000 all the chains seem to be quite usable.
+
+## Task 2
+Now let's take a look at the estimates for Prob(>0.5):
+
+```{r}
+for (r in 1:4){
+  print(paste("Autocorrelation: ", table.entries[r,"corr"]))
+  print("==============================================")
+  probs1 <- c(0,0,0)
+  for (j in 1:3){
+    print(paste("Sample-size: ", c(10,100,1000)[j]))
+    print("----------------------------------------------")  
+    print(paste("Prob( > 0.5): ", mean(res[2,,j,r])))
+    probs1[j] <- abs((1-pnorm(.5)) - mean(res[2,,j,r]))
+    print("----------------------------------------------")
+  }
+  print("Summary:")
+  print("-----------------------------------------------")
+  print("Development of difference between ~prob(>.5) and true prob(>.5):")
+  print(probs1)
+  print("==============================================")
+  print("")
+}
+```
+
+Above we see the different results for Prob(>0.5) compared to the true value for a N(0,1) distribution (~0.31). Again, the estimates of the probability are closer to the true value as the sample size grows. The convergence is faster if autocorrelation is lower, but at n=1000 the chains are still quite usable regardless of autocorrelation.
+
+## Task 3
+Now let's take a look at the estimates for Prob(>2):
+
+```{r}
+for (r in 1:4){
+  print(paste("Autocorrelation: ", table.entries[r,"corr"]))
+  print("==============================================")
+  probs2 <- c(0,0,0)
+  for (j in 1:3){
+    print(paste("Sample-size: ", c(10,100,1000)[j]))
+    print("----------------------------------------------")  
+    print(paste("Prob( > 2): ", mean(res[3,,j,r])))
+    probs2[j] <- abs((1-pnorm(2)) - mean(res[3,,j,r]))
+    print("----------------------------------------------")
+  }
+  print("Summary:")
+  print("-----------------------------------------------")
+  print("Development of difference between ~prob(>2) and true prob(>2):")
+  print(probs2)
+  print("==============================================")
+  print("")
+}
+```
+And no surprises here. Again we see convergence with bigger amounts of samples, and slower convergence at higher autocorrelation.
+
+## Task 4
+The general conclusion is already mentioned as a part of the answers above, but in accordance to the law or large numbers, the estimates based on the samples converges towards the true distribution when the sample-size grows. Autocorrelation slows down the convergence, as the values tend to be more linked to each other, and therefore do not represent as random a sample as they would without autocorrelation, so you need bigger samples. At sample-size 1000, the values are quite reliable, so you would want to take a big enough amount of samples when using Markov chains.

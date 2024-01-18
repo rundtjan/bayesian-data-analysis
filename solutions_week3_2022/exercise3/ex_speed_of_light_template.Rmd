@@ -1,0 +1,89 @@
+---
+title: "Speed of light data analysis"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Instructions
+
+Here we redo the analysis from page 66 in BDA3. The data are available from ex_speedOfLight.dat.
+
+Simon Newcomb conducted experiments on speed of light in 1882. He measured the time required for 
+light to travel a certain distance and here we will analyze a data recorded as deviations from $24,\!800$
+nanoseconds.  The model used in BDA3 is 
+%
+\begin{align*}
+y_i &\sim N(\mu, \sigma^2) \\
+p(\mu,\sigma^2) &\propto \sigma^{-2}.
+\end{align*}
+%
+where $y_i$ is the $i$'th measurement, $\mu$ is the mean of the measurement and $\sigma^{2}$ 
+the variance of the measurements. Notice that this prior is improper ("uninformative"). 
+This corresponds to widely used uniform prior for $\mu$ in the range $(-\infty,\infty)$, and uniform prior for $\log(\sigma)$ (BDA3 pp. 66, 52, and 21). Both priors are improper and 
+cannot be found from Stan. 
+You can use instead
+%
+\begin{align}
+p(\mu) &\sim N(0,(10^3)^2)\nonumber\\ 
+p(\sigma^2) &\sim \text{Inv-}\chi^2(\nu=4,s^2=1)  \label{eq:Inv-chi_prior}
+\end{align}
+
+In this exercise your tasks are the following:
+
+ 1. Write a Stan model for the above model and sample from the posterior of the parameters. Report the posterior mean, variance and 95\% central credible interval for $\mu$ and $\sigma^2$.
+ 2. Additionally draw samples from the posterior predictive distribution of hypothetical new measurement $p(\tilde{y}|y)$. Calculate the mean, variance and 95\% quantile of the posterior predictive distribution. 
+ 3. How does the posterior predictive distribution differ from the posterior 
+of $\mu$ and Why? 
+ 4. Which parts of the model could be interpreted to correspond to aleatory and epistemic uncertainty? Discuss whether this distinction is useful here. 
+ 5. Instead of Inverse-$\chi^2$ distribution the variance parameter prior has traditionally been defined using Gamma distribution for the precision parameter $\tau=1/\sigma^2$. By using the results in Appendix A of BDA3 derive the analytic form of a Gamma prior for the precision corresponding to the prior \eqref{eq:Inv-chi_prior}. This should be of the form $\text{Gamma}(\alpha,\beta)$, where $\alpha$ and $\beta$ are functions of $\nu$ and $s^2$.
+
+**Note!** Many common distributions have multiple parameterizations, for which 
+reason you need to be careful when interpreting others' works. The 
+variance/precision parameter and their priors are notorious for this. The reason 
+is mainly historical since different parameterizations correspond to different 
+analytical solutions.
+
+**Grading:** 2 points from correct answer for each of the above steps.
+
+## Model answers
+
+
+Load the needed libraries into R and set options for multicore computer.
+```{r}
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+set.seed(123)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+**Part 1. **
+
+write the model description, set up initial values for 4 chains and sample from the posterior
+```{r}
+
+```
+
+Let's then examine the convergence and autocorrelation of the chains.
+```{r}
+
+
+```
+
+
+**Part 2.**
+
+
+**Part 3**
+
+
+**Part 4**
+
+
+
+

@@ -1,0 +1,212 @@
+---
+title: "model checking speed of light"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Example on posterior predictive check
+
+This mark-down document illustrates how to conduct posterior predictive check. The example is directly from BDA3 and concerns analyzing the speed-of-light data.
+
+
+Load the needed libraries into R and load the data.
+```{r}
+# (if these are not yet installed you need to run first
+#  install.packages("name of the package"))
+rm(list = ls())
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+dataset <- read.table("ex_speedOfLight.dat", header = TRUE)
+dataset
+y <- dataset$y
+hist(y, 20)
+# set data into named list
+data = list(N = nrow(dataset), y = y)
+```
+
+## Gaussian observation model
+
+The model description is written in file "ex_speedOfLight.stan". Next, we run the Markov chain sampling with Stan:
+
+```{r}
+#initialize parameters
+init1 = list(mu = 10, tau = 1)
+init2 = list(mu = 20, tau = 0.05)
+init3 = list(mu = 30, tau = 0.001)
+init4 = list(mu = 40, tau = 0.01)
+inits <- list(init1, init2, init3, init4) 
+
+post=stan(file="ex_speedOfLight.stan",data=data,warmup=500,iter=2000,chains=4,thin=5,init=inits,control = list(adapt_delta = 0.8,max_treedepth = 15))
+
+#see some summary statistics, are they similar with different chains, see PSRF by Gelman and Rubin (Rhat in Stan), should be Rhat<1.1 if converged
+print(post)
+#summary(post)
+
+#check the convergence visually, plot the sample chains 
+plot(post, pars=c("mu","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+
+# plot autocorrelation function
+stan_ac(post, pars=c("mu","sigma2"), inc_warmup = FALSE, lags = 25)
+
+#extract the posterior samples of mu and sigma^2 as a matrix
+post_sample=as.matrix(post, pars =c("mu","sigma2"))
+dim(post_sample)
+mu_sample=post_sample[,1]
+sigma2_sample=post_sample[,2]
+```
+
+Next we conduct a visual posterior predictive check for the speed of light data in similar manner as in the Chapter 6 of BDA3.
+  
+We sample 20 replicates of the data set and plot the histogram of each replicate data set. Below we demonstrate it in 2 different ways.
+
+
+ 1. We get the replicates from Stan because we have added a generated quantities block to the Stan model
+```{r}
+y_rep_stan<- as.matrix(post,pars="y_rep")
+dim(y_rep_stan)
+
+#make a histogram and compare with the original data. Should be similar if the
+#model works well
+par(mfrow=c(4,5)) # Open figure for plotting the examples
+for (i in 1:20) {
+  ind=floor( length(mu_sample)*runif(1))
+  hist(y_rep_stan[ind,],breaks=20)
+}
+hist(y,breaks=40)
+# dev()
+# par(mfrow=c(4,5)) # Open figure for plotting the examples
+# for (i in 1:20) {
+#   ind=floor( length(mu_sample)*runif(1))
+#   hist(y_rep_stan[ind,],breaks=20)
+# }
+```
+
+ 2. Draw samples from the posterior predictive distribution outside Stan
+```{r}
+par(mfrow=c(4,5))              
+for (i in 1:20) {
+  ind=floor( length(mu_sample)*runif(1))
+  y_rep_R = rnorm(66, mu_sample[ind], sqrt(sigma2_sample[ind]))
+  hist(y_rep_R,breaks=20)
+}
+hist(y,breaks=20)
+```
+
+Now we can compare the replicate data set histograms to the histogram of the original data. The dataset $y$ contains two data points which deviate largely from the rest. 
+ These points can be genuine or outliers in which case caused by, e.g., the lack of precision in the measurement instrument or due to a human  error in the numerical annotation of the observation. Either way, the tails of the Gaussian distribution drop fast and, it should be noted that the Gaussian observation model is not able to accomodate outliers. Hence, in this case, the histogram for the posterior predictive distribution tend to not match the histogram of the original dataset.
+
+## Student-t observation model
+
+Now we change our observation model to Student-$t$ with 4 degrees of freedom and redo 
+the above steps for this revised model. 
+
+
+```{r}
+ex_speedOfLight_tdistr = "
+data{
+  int N; //the number of observations
+  vector[N] y; //data recorded as deviations from 24800 nanoseconds
+}
+parameters {
+  real mu; //mean 
+  real<lower=0> tau; //precision
+}
+model{
+  mu~normal(0,sqrt(10^6));
+  tau~gamma(2,2);
+  y ~ student_t(4,mu,sqrt(1/tau));
+}
+generated quantities{
+  real<lower=0> sigma2;   
+  vector[N] y_rep; //replicates
+  
+  sigma2=1/tau;
+  for (i in 1:N){
+    y_rep[i]=student_t_rng(4,mu,sqrt(1/tau));
+  }
+}
+"
+
+#Fit a model defined in the Stan modeling language 
+post_tdistr=stan(model_code=ex_speedOfLight_tdistr,data=data,warmup=500,iter=2000,chains=4,thin=5,init=inits,control = list(adapt_delta = 0.8,max_treedepth = 15))
+
+#can check the variables in the model
+names(post)
+#see some summary statistics, are they similar with different chains, see PSRF by Gelman and Rubin (Rhat in Stan), should be Rhat<1.1 if converged
+print(post)
+
+#check the convergence visually, plot the sample chains 
+plot(post, pars=c("mu","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+
+# plot autocorrelation function
+stan_ac(post, pars=c("mu","sigma2"), inc_warmup = FALSE, lags = 25)
+```
+
+Let's compare the posterior of $\mu$ under the Gaussian and Student-t model to see how the posterior of $\mu$ differs from the posterior with Gaussian observation model?
+```{r}
+#Student's t-distribution
+#extract the posterior samples of mu and sigma^2 as a matrix
+post_sample_tdistr=as.matrix(post_tdistr, pars =c("mu","sigma2"))
+dim(post_sample_tdistr)
+mu_sample_tdistr=post_sample_tdistr[,1]
+sigma2_sample_tdistr=post_sample_tdistr[,2]
+
+mean(mu_sample_tdistr)
+median(mu_sample_tdistr)
+var(mu_sample_tdistr)
+quantile(mu_sample_tdistr, c(0.025, 0.975))
+
+#Gaussian observation model
+mean(mu_sample)
+median(mu_sample)
+var(mu_sample)
+quantile(mu_sample, c(0.025, 0.975))
+
+par(mfrow=c(1,2))
+hist(mu_sample,main="posterior of mu, Gaussian",breaks=50)
+hist(mu_sample_tdistr,main="posterior of mu, t-distribution",breaks=50)
+```
+There is clearly less variance in $p(\mu|y)$ when $y|\mu,\sigma^2 ~ Student-t()$ compared to $\mu|y$ when $y|\mu,\sigma^2 ~ Gaussian()$
+
+
+Let's then exaine how does the posterior predictive checks look like? Let's do it again in 2 different ways
+
+ 1. I get the relicates from Stan because I have added a generated quantities block to the Stan model
+```{r}
+y_rep_stan_tdistr<- as.matrix(post_tdistr,pars="y_rep")
+dim(y_rep_stan_tdistr)
+
+#make a histogram and compare with the original data. Should be similar if the
+#model works well
+par(mfrow=c(4,5)) # Open figure for plotting the examples
+for (i in 1:20) {
+  ind=floor(length(mu_sample_tdistr)*runif(1))
+  hist(y_rep_stan_tdistr[ind,],breaks=20)
+}
+hist(y,breaks=20)
+```
+
+ 2. Draw samples from the posterior predictive distribution here
+```{r}
+par(mfrow=c(4,5))              
+for (i in 1:20) {
+  ind=floor( length(mu_sample_tdistr)*runif(1))
+  y_rep_R_tdistr =  mu_sample_tdistr[ind] + sqrt(sigma2_sample_tdistr[ind])*rt(66, 4, 0)
+  hist(y_rep_R_tdistr,breaks=20)
+}
+hist(y,breaks=20)
+```
+
+When we assume $y|\mu,\sigma^2 ~ Studend-t()$, the histograms generated with the replicates from the posterior predictive distribution show better match with the dataset. This is not the case when we assume $y|\mu,\sigma^2 ~ Gaussian()$
+
+Which of the models looks better from the posterior predictive check point of view?
+
+ Due to aforementioned reasons, from the posterior predictive check point of view, the data analysis with the Student-t model performs better.

@@ -1,0 +1,197 @@
+---
+title: "Effect of bottom coverage to larval presence"
+subtitle: "Week4-ex3, solution"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+set.seed(123)
+```
+
+
+In this exercise, we continue the analysis of the white fish larval areas (week 2, exercise 3). We are again interested in analysing whether or not bottom vegetation affects white fish larvae occurrence probability. However, instead of having a common probability of presence parameter across the Gulf of Bothnia, we expand the model so that it allows the probability of presence to vary between sampling areas. This modification to the model encodes an assumption that some areas may be more preferable to white fish than others. 
+
+Let's first explore the data a bit more.
+```{r}
+# Read the data
+data = read.csv("white_fishes_data.csv")
+# Form a data table for sites without bottom vegetation
+y.noveg = table(data$AREANAME[data$BOTTOMCOV==0], data$WHIBIN[data$BOTTOMCOV==0])
+colnames(y.noveg) <- c("y=0","y=1")
+N.noveg = rowSums(y.noveg)
+# Form a data table for sites with bottom vegetation
+y.veg = table(data$AREANAME[data$BOTTOMCOV==1], data$WHIBIN[data$BOTTOMCOV==1])
+colnames(y.veg) <- c("y=0","y=1")
+N.veg = rowSums(y.veg)
+
+par(mfrow=c(1,2))
+plot(N.veg, main="Number of sampling sites", xlab="Area index", ylab="Number of sites")
+points(N.noveg, col="red")
+legend(1, 39, c("veg.","no veg."),col=c("black","red"), pch=1, cex=1, box.lty=1)
+plot(y.veg[,2]/N.veg, main="proportion of sites with whitefish", xlab="Area index", ylab="proportion")
+points(y.noveg[,2]/N.noveg, col="red")
+print(y.veg)
+```
+```{r}
+print(y.noveg)
+
+
+```
+The first figure above shows the number of sampling sites for each of the 19 study areas and both bottom vegetation types (with and without). The second figure shows the proportion of the sites with white fish larvae within each area and bottom vegetation type. It is rather evident that there is considerable variation in the sample proportions of the second figure. However, we would want to know how much of this is actually due to varying probability of presence vs. pure chance. Note also, that there are no sampling sites in Kalajoki (sampling area number 7 below) with vegetation cover. Hence, we have missing data there.
+```{r}
+#N.veg[1]
+veg <- y.veg[19:36]
+veg <- append(veg, 0, 6)
+#y.noveg
+noveg <- y.noveg[20:38]
+#noveg
+veg
+noveg
+```
+```{r}
+y2 <- aperm(array(c(veg, noveg), dim=c(19,2)))
+#ys2 <- array(c(y2[,1], y2[,2]), c(2, 18))
+#y2
+#ys2
+y2
+```
+```{r}
+append(N.veg, 1,6)
+```
+
+```{r}
+Ns <- aperm(array(c(N.veg, N.noveg), c(19,2)))
+dim(Ns)
+```
+We will denote by $\theta_{i,c}$ the probability that white fish larvae are present in area $i$ at sites with ($c=1$) or without ($c=0$) bottom vegetation. The data will be denoted by $y_{i,c}$ and $N_{i,c}$ where the former denotes the number of sites with white fish larvae and the latter the total number of sites inside an area $i$ with ($c=1$) or without ($c=0$) bottom vegetation. We will now implement the following model
+\begin{align*}
+y_{i,c} & \sim \text{Binom}(\theta_{i,c},N_{i,c})\\
+\theta_{i,c} & \sim \text{Beta}(\mu_c s_c, s_c-\mu_c s_c) \\
+\mu_c &\sim \text{Unif}(0,1) \\
+s_c &\sim \text{log-}N(4, 4).
+\end{align*}
+where $\mu_c$ is the prior mean of $\theta_{i,c}$  and $s_c$ governs the uncertainty about it. 
+The parametrization of log-Gaussian distribution $s_c \sim \text{log-}N(m, \sigma^2)$ 
+is such that $E[\log(s_c)]=m$ and $Var[\log(s_c)]=\sigma^2$
+
+```{r}
+fish_model_legacy = "
+data {
+   int<lower = 0> dim;
+   int<lower = 0> n;
+   int y[dim, n];
+   int total[dim, n];
+}
+
+parameters {
+   real<lower=0, upper=1> theta[dim, n];
+   real<lower=0.01, upper=0.99> mu[dim];
+   real<lower=0.01> s[dim];
+}
+
+model {
+   for (d in 1:dim){
+      s[dim] ~ lognormal(4, 2);
+      for (site in 1:n){ 
+         theta[d, site] ~ beta(mu[d]*s[d], s[d] - mu[d]*s[d]);
+         y[d, site] ~ binomial(total[d, site], theta[d, site]);
+      }
+   }
+}
+"
+
+
+fish_model = "
+data {
+   int<lower = 0> n;
+   int y[n];
+   int total[n];
+}
+
+parameters {
+   real<lower=0, upper=1> theta[n];
+   real<lower=0.01, upper=0.99> mu;
+   real<lower=0.01> s;
+}
+
+model {
+   s ~ lognormal(4, 2);
+   for (site in 1:n){ 
+      theta[site] ~ beta(mu*s, s - mu*s);
+      y[site] ~ binomial(total[site], theta[site]);
+   }
+}
+
+"
+
+
+```
+
+```{r}
+#dataset_legacy <- list("dim"=2, "n"=19, "y"=y2, "total"=Ns)
+#post=stan(model_code=fish_model,data=dataset,warmup=500,iter=1000,chains=3,thin=1)
+
+dataset <- list("n" = 18, "y"=y.veg[19:36], "total"=N.veg)
+post=stan(model_code=fish_model,data=dataset,warmup=500,iter=1000,chains=3,thin=1)
+
+```
+```{r}
+plot(post, plotfun = "trace", pars = c("mu"), inc_warmup = TRUE)
+print(post)
+```
+```{r}
+stan_ac(post,c("s[1]", "s[2]", "mu[1]", "mu[2]", "theta[1,1]", "theta[2,1]", "theta[1,10]", "theta[2,15]"),inc_warmup = FALSE, lags = 25)
+```
+```{r}
+Nsamp=as.matrix(post)
+Nsamp
+
+```
+```{r}
+plot(post, plotfun = "hist", pars = colnames(Nsamp) ,bins=50)
+#colnames(Nsamp)
+#Nsamp[,40]
+
+```
+```{r}
+diff_mu = Nsamp[,"mu[1]"] - Nsamp[,"mu[2]"]
+#diff_theta = Nsamp[1:1, 1:1] - Nsamp[1:1, 19:19]
+diff_theta <- matrix(c(0), nrow = 1500, ncol = 18)
+ind = 1
+for (i in 1:36){
+  if (i %% 2 > 0){
+    diff_theta[,ind] = Nsamp[,i] - Nsamp[,i+1]
+    ind = ind +1
+  } else {
+    next
+  }
+}
+hist(diff_mu)
+```
+```{r}
+
+
+```
+
+
+\begin{enumerate}
+\item Implement the model in Stan and sample from the posterior for the parameters. Check for convergence for all parameters, and examine what is the autocorrelation for $s_c$, $\mu_c$ and few $\theta_{i,c}$. Visualize the posterior for $\mu_c$, $s_c$ and $\theta_{i,c},i=1,\dots,19$.
+\item Visualize also the posterior distributions of $\Delta\mu=\mu_0-\mu_1$ and $\phi_i = \theta_{i,0}-\theta_{i,1}$ for each area $i=1,\dots,19$.
+\item Sample from the posterior predictive distribution of outcome $\tilde{y}_{19,c}$ of a new sampling with $\tilde{N}_{19}=10$ in the sampling area $i=19$ for both vegetated and non-vegetated sites. Visualize the resulting posterior samples as well as the posterior distribution for $\tilde{y}_{19,0}-\tilde{y}_{19,1}$.
+\item Sample from the posterior predictive distribution of outcome $\tilde{y}_{20,c}$ of a new sampling with $\tilde{N}_{20}=10$ in a new sampling area $i=20$ (an area from where we don't have data yet) within the Gulf of Bothnia. Do this for both vegetated and non-vegetated sites. Visualize the resulting posterior samples as well as the posterior distribution for $\tilde{y}_{20,0}-\tilde{y}_{20,1}$.
+\item The posterior distributions calculated in exercise 3 of week 2 correspond to the so called pooled estimate of $\theta_c$. Discuss how does the posterior of the pooled $\theta_c$ differ from the population mean, $\mu_c$, and from the individual $\theta_{i,c}$ in the hierarchical model? 
+Which model seems more justified in your opinion and why?
+\end{enumerate}
+
+
+# Grading
+
+**Total 20 points** Each of the steps provides 4 points from correct answer and 2 points from an answer that is towards the right direction but includes minor mistake (e.g. a bug or typo)
+
+
+# References
+
+Lari Veneranta, Richard Hudd and Jarno Vanhatalo (2013). Reproduction areas of sea-spawning Coregonids reflect the environment in shallow coastal waters. Marine Ecology Progress Series, 477:231-250. <http://www.int-res.com/abstracts/meps/v477/p231-250/>

@@ -1,0 +1,57 @@
+---
+title: "Conditional probability"
+subtitle: "Week1-ex3, solution"
+output: pdf_document 
+---
+
+Suppose that if $\theta = 1$, then $y$ has a Binomial distribution with success probability  $0.2$, and if $\theta = 2$, then $y$ has a Binomial distribution with success probability  $0.6$. Also, suppose that the sample size is $n=10$ and $Pr( \theta = 1) = 0.5$ and $Pr(\theta = 2) = 0.5$. 
+
+a) Write the formula for the marginal probability density for $y$ and sketch it. 
+b) What is $Pr( \theta = 1 | y = 3)$
+c) skecth the posterior predictive distribution for a new observation $\tilde{y}$ with sample size $\tilde{n}=10$. What is the posterior predictive probability that $\tilde{y}=3$?
+
+\subsection{Solution}
+
+
+## Part a)
+The marginal probability density for $y$ is 
+
+$p(y) = 0.5*Bin(y|10,0.2) + 0.5*Bin(y|10,0.6)$
+
+```{r}
+n=10
+y = seq(0, n, length=n+1)
+# Calculate and draw the marginal density of y
+ypdf = 0.5*dbinom(y,size = n,prob = 0.2) + 0.5*dbinom(y,size = n,prob = 0.6)
+plot(y,ypdf, main="marginal density of y", xlab="y", ylab="p(y)")
+```
+
+## Part b)
+
+posterior probability that theta = 1
+```{r}
+Pr_post = dbinom(3,size=n,prob=0.2)/(dbinom(3,size=n,prob=0.2) + dbinom(3,size=n,prob=0.6))
+print(Pr_post)
+```
+
+## Part c)
+
+Let's scetch the posterior predictive distribution of new observation
+```{r}
+n=10
+y = seq(0, n, length=n+1)
+# Calculate and draw the marginal density of y
+ypdf = Pr_post*dbinom(y,size = n,prob = 0.2) + (1-Pr_post)*dbinom(y,size = n,prob = 0.6)
+plot(y,ypdf, main="marginal density of y", xlab="y", ylab="p(y)")
+```
+
+The posterior predictive probability that $\tilde{y}=3$ is
+```{r}
+Pr_post*dbinom(3,size = n,prob = 0.2) + (1-Pr_post)*dbinom(3,size = n,prob = 0.6)
+```
+
+
+## Grading
+
+**Total 10 points:** 3 points for getting a) correct. 4 points for getting b) correct. 3 points for getting c) correct.
+

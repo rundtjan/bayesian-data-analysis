@@ -1,0 +1,239 @@
+---
+title: "Linear regression for Mauna Loa CO2 data"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Mauna Loa CO2 data 
+
+
+This is an example of linear regression and we will analyse the Mauna Loa CO2 data\footnote{\url{http://cdiac.esd.ornl.gov/ftp/trends/co2/maunaloa.co2}}. 
+The data contains monthly concentrations adjusted to represent the 15th day of each month. 
+Units are parts per million by volume (ppmv) expressed in the 2003A SIO manometric mole fraction scale. 
+The "annual average" is the arithmetic mean of the twelve monthly values where no monthly values are missing.
+
+We want to construct and infer with Stan the following model:
+%
+\begin{align*}
+  y_i &= \mu(x_i) + \epsilon_i \\
+  \epsilon_i &\sim N(0, \sigma^2) \\
+   \mu(x_i) &= a + bx_i \\
+   p(a)&=p(b) \propto 1 \\
+   \sigma^2 & \sim \text{Inv-Gamma}(0.001, 0.001)      
+\end{align*}
+%
+where $y_i, i=1,\cdots,n$ are the reported CO2 values, $x_i$ is time, measured as months from the first observation, $a$ is an intercept, $b$ is the linear weight (slope) and $\sigma^2$ is the variance of the "error" terms, $\epsilon_i$, around the linear mean function.
+
+In practice, it is typically advisable to construct the model for standardized observations $\dot{y}_i = (y_i-\text{mean}(y))/\text{std}(y)$ where $\text{mean}(y))$ and $\text{std}(y)$ are the sample mean and standard deviations of $y_i$ values. 
+Similar transformation should be done also for covariates $x$.
+You should then sample from the posterior of the parameters ($\dot{a},\dot{b},\dot{\sigma}^2$) corresponding to the standardized data $\dot{y}_i$ and $\dot{x}_i$.
+After this you have to transform the samples of $\dot{a},\dot{b},\dot{\sigma}^2$ to the original scale.
+
+Your tasks are the following:
+
+ 1. Solve the equations to transform samples of $\dot{a},\dot{b},\dot{\sigma}^2$ to the original scale $a,b,\sigma^2$.
+ 2. Sample from the posterior of the parameters of the above model using the Maunaloa CO2 data. (You can do this either with transformed or original data so if you didn't get step  1 right you can still proceed with this.) Check the convergence of model parameters and report the results of convergence tests.
+ Visualize the marginal posterior distribution of the model parameters and report their posterior mean and 2.5% and 97.5% posterior quantiles.
+ 3. Discuss how you would intepret the linear mean function $\mu(x)$ and how you would intepret the error terms $\epsilon_i$.
+ 4. Plot a figure where you visualize 
+	* The posterior mean and 95\% central posterior interval of the mean function $\mu(x)$ as a function of months from January 1958 to December 2027.
+	* The posterior mean and 95\% central posterior interval of observations $y_i$ as a function of months from January 1958 to December 2027. In case of historical years, consider the distribution of potential replicate observations that have not been measured but could have been measured.
+	* plot also the measured observations to the same figure
+ 5. Visualize 
+	* the Posterior predictive distribution of the mean function, $\mu(x)$ in January 2025 and in January 1958 and the difference between these. 
+	* the Posterior predictive distribution of observations, $y_i$ in January 2025 and in January 1958 and the difference between these. 
+  * Discuss why the distributions of $\mu(x_i)$ and $y_i$ differ
+
+See the R-template for additional instructions.
+
+**Grading:** This exercise is worth 20 points so that each step gives 4 points.
+
+## answers
+
+**1. variable transformations**
+
+**2. Build and analyze Stan model**
+
+Load the needed libraries.
+```{r}
+library(ggplot2)
+library(StanHeaders)
+library(rstan)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+Load the data and explore its properties
+```{r}
+# Load the data and explore it visually
+maunaloa.dat = read.table("maunaloa_data.txt", header=FALSE, sep="\t")
+# The columns are 
+# Year January February ... December Annual average
+
+#  Notice! values -99.99 denote NA
+
+# Let's take the yearly averages and plot them
+x.year = as.vector(t(maunaloa.dat[,1]))
+y.year = as.vector(t(maunaloa.dat[,14]))
+# remove NA rows
+x.year = x.year[y.year>0]
+y.year = y.year[y.year>0]
+plot(x.year,y.year)
+
+# Let's take the monthy values and construct a "running month" vector
+y.month.orig = as.vector(t(maunaloa.dat[,2:13]))
+x.month.orig = as.vector(seq(1,length(y.month.orig),1))
+
+# remove NA rows
+x.month.orig = x.month.orig[y.month.orig>0]
+y.month.orig = y.month.orig[y.month.orig>0]
+plot(x.month.orig,y.month.orig)
+
+
+# standardize y and x
+my =         # mean of y values
+stdy =       # std of y values
+y.month =    # standardized y values
+
+mx =         # mean of y values
+stdx =       # std of y values
+x.month =    # standardized y values
+
+plot(x.month,y.month)
+
+```
+
+Write the model description and set data into list
+```{r}
+mauna_loa_c02_model = "
+data{
+
+}
+parameters{
+
+}
+transformed parameters{
+ \\ NOTE! you don't necessarily need this block even though 
+ \\ it will be in the model answers to illustrate its use
+}
+model{
+
+}"
+
+# data list
+data <- list ( "fill in" )
+#if you want to see what you get with the original data (not transformed)
+#data <- list (N=length(x.month.orig), y=y.month.orig, x=x.month.orig)
+```
+
+Now we will start the analysis. Define parameters and set initial values for them. We are going to sample four chains so we need four starting points. It is good practice to set them far apart from each others. We build linear regression model on data in order to get some reasonable initial values for our model parameters. Examine the convergence.
+
+```{r}
+# Initial values
+init1 <- 
+init2 <- 
+init3 <- 
+init4 <- 
+inits <- 
+
+## Run the Markov chain sampling with Stan:
+post=stan(model_code=mauna_loa_c02_model,data=data,warmup=500,iter=2000,chains=4,thin=1,init=inits,control = list(adapt_delta = 0.8,max_treedepth = 10))
+
+# Check for convergence, see PSRF (Rhat in Stan)
+print(post,pars=c("a","b","sigma2"))
+print(post)
+plot(post, pars=c("a","b","sigma2"),plotfun= "trace", inc_warmup = TRUE)
+plot(post, pars=c("a","b","sigma2"), plotfun= "trace", inc_warmup = FALSE)
+#plot(post, pars=c("mu"), plotfun= "trace", inc_warmup = FALSE)
+```
+
+
+Visualize and summarize parameter posteriors in original scale.
+Extract the posterior samples as a matrix. NOTE THAT ABOVE YOU OBTAINED THE PARAMETERS $\dot{a}$, 
+$\dot{b}$ and $\dot{\sigma^2}$. You should continue with the original parameters $\dot{a}, $\dot{b} and $\dot{\sigma^2}$ 
+from now on. So make the needed transformations. If you have not solved the transformations, you should draw histograms with samples in variable post.
+
+```{r}
+post_sample=as.matrix(post, pars =c("a","b","sigma2"))
+dim(post_sample) 
+#one column contains posterior samples for one variable
+a_dot=post_sample[,1]
+b_dot=post_sample[,2]
+sigma2_dot=post_sample[,3]
+
+a=
+b=
+sigma2=
+```
+
+Now parameter a contains a sample from the posterior $p(a|y,x,n)$
+and parameter b contains sample from the posterior $p(b|y,x,n)$.
+We can now plot sample chains and histograms of them and do the required summaries.
+
+```{r}
+#Trace plot of MCMC output to see if the chains have converged for the original parameters
+plot(a, main="a", xlab="iter",type="l")
+plot(b, main="b", xlab="iter",type="l")
+plot(sigma2, main="sigma2", xlab="iter",type="l")
+
+#Note, if the chains do not look converged see what is the problem and rerun the model
+
+hist(a, main="p(a|y,x,n)", xlab="a")
+hist(b, main="p(b|y,x,n)", xlab="b")
+hist(sigma2, main="p(tau|y,x,n)", xlab="sigma2")
+
+#calculate the required summaries
+
+
+```
+
+**3. Interpretation of $\mu(x)$ and $\epsilon_i$**
+
+
+
+**4. visualization of the regression curve**
+
+Data covers years from 1958 to 2008. Therefore, we need to construct prediction points 
+and predict the historical and future next 20 years of CO2 concentrations
+```{r}
+x.pred= seq(1,70*12,length=70*12)
+
+mu = matrix(NA,length(x.pred),length(b))      # matrix of posterior samples of mu
+y.tilde = matrix(NA,length(x.pred),length(b)) # matrix of posterior samples of y.tilde
+
+mean_mu=rep(NA, length(x.pred))              # posterior mean of mu
+int_mu = matrix(NA,length(x.pred),2)         # posterior 95% interval of mu
+
+mean_y=rep(NA, length(x.pred))              # posterior mean of y.tilde
+int_y = matrix(NA,length(x.pred),2)         # posterior 95% interval of y.tilde
+
+for (i in 1:length(x.pred)) {
+  #remember mu_i = a + b*x_i
+  mu[i,] = 
+  mean_mu[i] = 
+  int_mu[i,] = 
+  #y_i = mu_i + e_i and e_i ~ N(0,sigma2)
+  y.tilde[i,] = 
+  mean_y[i] = 
+  int_y[i,] = 
+}
+
+# plot the mean and quantiles for mean function and (replicate) observations and the real observations
+# Note! plot these in the original scale
+#fill in here and at the end plot the real observations
+
+```
+
+**5. CO2 concentration in January 2025 and 1958**
+
+ Posterior predictive distribution of the mean function in January 2025, January 1958 
+ and the difference between these. Notice! x=1 corresponds to January 1958
+
+```{r}
+
+```
+

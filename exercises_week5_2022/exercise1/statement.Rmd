@@ -1,0 +1,36 @@
+---
+title: "Monte Carlo error"
+subtitle: "Week5-ex2, problem statement"
+output: pdf_document
+---
+
+R-template \texttt{ex\_monte\_carlo\_error\_template.Rmd}
+
+The purpose of this exercise is to examine the properties of Monte Carlo approximation. We will continue from the model answers of the Markov chain exercise. Your tasks are the following:
+    
+\begin{itemize}
+\item Sample 100 independent realizations of length 2000 chains from the Markov chain defined in exercise 3.1 (that is; $\theta^{(1)},\dots, \theta^{(2000)}$) using each of the combinations of $\phi$ and $\sigma^2$ in the rows of the below table \\
+    \begin{center}
+    \begin{tabular}{c|c|c|c}
+    $\text{Var}[\theta^{(i)}]$ & $\phi$ & $\sigma^2$ & $\text{Corr}[\theta^{(i)},\theta^{(i+1)}]$\\
+    \hline
+    1 & 0    &  1    &  0\\ 
+    1 & 0.5  &  0.75 &  0.5\\
+    1 & 0.89 &  0.2  &  0.89\\
+    1 & 0.1  &  0.99 &  0.1\\
+    \end{tabular}
+    \end{center}
+    \item With each of the chains approximate $E[\theta^{(i)}]$, $\text{Pr}(\theta^{(i)}>0.5)$ and $\text{Pr}(\theta^{(i)}>2)$ using Monte Carlo with the $n=10$, $n=100$ and $n=1000$ last samples. Hence, you will construct 100 independent Monte Carlo approximations for the mean and two probabilities of $\theta$ corresponding to Markov chain sample sizes 10, 100 and 1000.
+    \item Examine the calculated Monte Carlo approximations, compare them to the exact answers for $\theta \sim N(0,1)$ (which is the distribution of $\theta^{(i)}$ in the limit of $i\rightarrow \infty$) and answer to the following questions:
+    \begin{enumerate}
+    \item How does the Monte Carlo estimate of $E[\theta^{(i)}]$ behave with respect to the number of samples and with respect to the autocorrelation of the Markov chain?
+    \item How does the Monte Carlo estimate of $\text{Pr}(\theta^{(i)}>0.5)$ behave with respect to the number of samples and with respect to the autocorrelation of the Markov chain?
+    \item How does the Monte Carlo estimate of $\text{Pr}(\theta^{(i)}>2)$ behave with respect to the number of samples and with respect to the autocorrelation of the Markov chain?
+    \item What kind of general conclusions can you make based on these results?
+    \end{enumerate}
+    \end{itemize}
+
+
+# Grading
+**Total 10 points** The results do not need to be presented exactly similarly as in the model results as long as they are presented so that they support the claims made. Questions 1-3 give in total 3 points each so that, 1 point for a serious attempt towards right direction, 1 point more for correctly conducted experiment and 1 point more for sensible/correct discussion on the results. Question 4 gives 1 point for sensible/correct discussion on the results.
+

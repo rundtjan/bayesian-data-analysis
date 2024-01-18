@@ -1,0 +1,16 @@
+---
+title: "Spam filter"
+subtitle: "Week1-ex1, problem statement"
+output: pdf_document
+---
+
+
+This exercise, with many alternative stories and numerical values, is a classical 
+example of the importance of prior information and of taking into account the 
+baseline prevalence. 
+
+Erik knows that 65\% of his emails are spam. Spam filter classifies 75\% of spam to be spam. Furthermore, filter classifies 6\% of emails as spam even if they are not spam. What is the probability that an email classified as spam is not spam? 
+
+# Grading
+
+**Total 10 points:** 3 points if prior and likelihood have been defined correctly. Extra 4 points if the Bayes Theorem has been formed correctly. Extra 3 points if the result is correct.
